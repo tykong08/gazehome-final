@@ -1,0 +1,214 @@
+[build-system]
+requires      = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name            = "gazehome"
+version         = "1.0.0"
+description     = "GazeHome - 시선 추적 기반 스마트홈 통합 플랫폼"
+readme          = "README.md"
+license         = { file = "LICENSE" }
+authors         = [
+  { name = "Chenkai Zhang (ck-zhang)", email = "original@example.com" },
+  { name = "Contributors" }
+]
+requires-python = ">=3.9"
+
+# 기본 문서
+keywords = ["gaze-tracking", "eye-tracking", "smart-home", "webcam", "mediapipe"]
+
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+  # 시선 추적 코어 (라즈베리파이는 시스템 패키지 또는 mediapipe-rpi4 사용)
+  "opencv-python>=4.5; platform_machine != 'aarch64'",
+  "mediapipe>=0.10; platform_machine != 'aarch64'",
+  "numpy>=1.22",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+  "screeninfo>=0.8",
+  "pyvirtualcam>=0.10",
+  
+  # 백엔드 API
+  "fastapi>=0.104.0",
+  "uvicorn[standard]>=0.24.0",
+  "websockets>=12.0",
+  "pydantic>=2.5.0",
+  "pydantic-settings>=2.1.0",
+  "python-multipart>=0.0.6",
+  "httpx>=0.25.0",
+  "pytz>=2025.2",
+  
+  # MQTT (추천 시스템)
+  "paho-mqtt>=1.6.1",
+  
+  # 데이터베이스 및 유틸리티
+  "sqlalchemy>=2.0",
+  "python-dotenv>=1.0.0",
+  "aiofiles>=23.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ck-zhang/eyetrax"
+Repository = "https://github.com/ck-zhang/eyetrax"
+Documentation = "https://github.com/ck-zhang/eyetrax/blob/main/README.md"
+Issues = "https://github.com/ck-zhang/eyetrax/issues"
+
+# ============================================================================
+# 의존성 관리
+# ============================================================================
+
+[project.optional-dependencies]
+# 시선 추적 코어 의존성 (자동 설치)
+core = [
+  "opencv-python>=4.5; platform_machine != 'aarch64'",
+  "mediapipe>=0.10; platform_machine != 'aarch64'",
+  "numpy>=1.22",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+  "screeninfo>=0.8",
+  "pyvirtualcam>=0.10",
+]
+
+# 라즈베리파이 전용 의존성
+rpi = [
+  "mediapipe-rpi4; platform_machine == 'aarch64'",
+  "numpy>=1.22",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+  "screeninfo>=0.8",
+  "pyvirtualcam>=0.10",
+]
+
+# 백엔드 API 서버 의존성
+backend = [
+  "fastapi>=0.104.0",
+  "uvicorn[standard]>=0.24.0",
+  "websockets>=12.0",
+  "pydantic>=2.5.0",
+  "pydantic-settings>=2.1.0",
+  "python-multipart>=0.0.6",
+  "httpx>=0.25.0",
+  "paho-mqtt>=1.6.1",
+]
+
+# 스마트홈 통합 (선택사항)
+integrations = [
+  # "aiohttp>=3.9.0",  # For Home Assistant API
+  # "aiomqtt>=1.2.0",  # For MQTT
+]
+
+# 개발 도구
+dev = [
+  "pytest>=7.4.0",
+  "httpx>=0.25.0",
+  "black>=23.0.0",
+  "ruff>=0.1.0",
+  "mypy>=1.0.0",
+]
+
+# 모든 것 설치
+all = [
+  "gazehome[core,backend,integrations,dev]",
+]
+
+# ============================================================================
+# 프로젝트 스크립트 진입점
+# ============================================================================
+
+[project.scripts]
+gazehome-backend   = "backend.run:main"
+gazehome-calibrate = "model.calibration:run_9_point_calibration"
+
+# ============================================================================
+# 빌드 설정
+# ============================================================================
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "model",
+  "backend",
+]
+
+[tool.hatch.build]
+include = [
+  "model/**",
+  "backend/**",
+  "frontend/**",
+  "LICENSE",
+  "README.md",
+  "QUICKSTART.md",
+]
+
+exclude = [
+  "**/__pycache__",
+  "**/*.pyc",
+  "**/node_modules",
+  "**/dist",
+  "**/build",
+  "**/.DS_Store",
+  "**/*.egg-info",
+]
+
+[tool.hatch.version]
+path = "model/_version.py"
+
+# ============================================================================
+# 개발 도구 설정
+# ============================================================================
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # 디렉토리
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | node_modules
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # Black이 처리
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+# ============================================================================
+# 프로젝트 메타데이터
+# ============================================================================
+
+[project.entry-points."gazehome"]
+backend = "backend.run:main"
+
+# ============================================================================
+# 노트: 프론트엔드 (Node.js/npm으로 관리)
+# ============================================================================
+# 프론트엔드는 별도로 frontend/package.json에서 관리됨
+# npm install && npm run build로 프로덕션 빌드 생성
+# 빌드 결과: frontend/dist/ → backend에서 정적 파일로 제공

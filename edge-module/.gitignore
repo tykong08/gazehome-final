@@ -1,0 +1,99 @@
+# ================================
+# 🧩 GAZEHOME MONOREPO GITIGNORE
+# Frontend (React/Electron) + Backend (FastAPI) + Model (Python)
+# ================================
+
+# ----------------
+# ⬢ Node.js / Frontend
+# ----------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Build outputs
+*.cache/
+*.tmp/
+*.out/
+*.lock
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ----------------
+# 🐍 Python / Backend / Model
+# ----------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.sqlite3
+.venv/
+env/
+venv/
+*.egg-info/
+.eggs/
+
+# ML / Data artifacts
+*.h5
+*.pt
+*.onnx
+*.tflite
+*.log
+*.csv
+*.npy
+*.npz
+checkpoints/
+runs/
+logs/
+outputs/
+data/
+datasets/
+
+# ----------------
+# 🧠 IDE / Editor settings
+# ----------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ----------------
+# 🧪 Testing / Coverage
+# ----------------
+coverage/
+.pytest_cache/
+junit/
+htmlcov/
+
+# ----------------
+# 🧱 System / OS
+# ----------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.pid
+*.seed
+
+# ----------------
+# 🧲 Raspberry Pi / Embedded
+# ----------------
+*.log
+*.bak
+*.tmp
+*.swp
+boot/
+mnt/
+*.img# Calibration data
+~/.gazehome/

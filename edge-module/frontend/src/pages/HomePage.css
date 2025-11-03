@@ -1,0 +1,356 @@
+.home-page {
+    min-height: 100vh;
+    background: var(--gray-50);
+    font-size: 14px;
+    /* 전체 폰트 크기 축소 */
+}
+
+.home-header {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 8px 0;
+    /* 패딩 축소 */
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-sm);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xl);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--gray-100);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.connection-status.connected {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.connection-status.disconnected {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 👁️ 시선 추적 최적화: 적당한 버튼 크기 */
+.notification-button {
+    position: relative;
+    padding: 6px;
+    min-width: 36px;
+    min-height: 36px;
+    background: var(--gray-100);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    color: var(--gray-700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-button svg {
+    width: 18px;
+    height: 18px;
+}
+
+.notification-button:hover {
+    background: var(--gray-200);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 20px;
+    height: 20px;
+    background: var(--danger);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    min-height: 36px;
+    background: var(--gray-100);
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.user-menu svg {
+    width: 16px;
+    height: 16px;
+}
+
+.icon-button {
+    padding: 6px;
+    min-width: 36px;
+    min-height: 36px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    color: var(--gray-700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-button svg {
+    width: 18px;
+    height: 18px;
+}
+
+.icon-button:hover {
+    background: var(--gray-100);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.home-main {
+    padding: 12px 0;
+}
+
+.welcome-section {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: var(--radius-md);
+    color: white;
+    text-align: center;
+}
+
+.welcome-section h1 {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.welcome-section p {
+    font-size: 0.75rem;
+    opacity: 0.9;
+}
+
+.devices-section {
+    margin-bottom: 12px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.section-header h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.device-count {
+    padding: 4px 10px;
+    background: var(--gray-100);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--gray-600);
+}
+
+/* 👁️ 페이지네이션 컨트롤 (시선 추적 최적화) */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+}
+
+.pagination-controls.bottom {
+    margin-top: var(--spacing-xl);
+    margin-bottom: 0;
+}
+
+.pagination-button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    min-width: 150px;
+    min-height: 80px;
+    background: white;
+    border: 3px solid var(--primary);
+    border-radius: var(--radius-xl);
+    color: var(--primary);
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-md);
+}
+
+.pagination-button:hover:not(:disabled) {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.pagination-button:active:not(:disabled) {
+    transform: translateY(-2px) scale(0.98);
+}
+
+.pagination-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: var(--gray-300);
+    color: var(--gray-400);
+}
+
+.pagination-button.prev {
+    justify-content: flex-start;
+}
+
+.pagination-button.next {
+    justify-content: flex-end;
+}
+
+.page-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: var(--radius-xl);
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    min-height: 80px;
+    box-shadow: var(--shadow-md);
+}
+
+.current-page {
+    font-size: 2rem;
+}
+
+.page-divider {
+    opacity: 0.7;
+    font-size: 1.2rem;
+}
+
+.total-pages {
+    opacity: 0.9;
+}
+
+/* 기기 그리드 - 7인치 화면 최적화 (2열 배치) */
+.devices-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+/* 기기 없을 때 메시지 */
+.no-devices-message {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    background: var(--gray-50);
+    border-radius: var(--radius-xl);
+    margin-top: var(--spacing-xl);
+}
+
+.no-devices-message p {
+    font-size: 1.2rem;
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+.no-devices-message .hint {
+    font-size: 1rem;
+    color: var(--gray-500);
+    font-weight: 400;
+}
+
+@media (max-width: 600px) {
+    .devices-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pagination-button {
+        min-width: 120px;
+        min-height: 70px;
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: 1rem;
+    }
+
+    .page-indicator {
+        min-height: 70px;
+        font-size: 1.2rem;
+    }
+
+    .current-page {
+        font-size: 1.5rem;
+    }
+}
+
+@media (min-width: 900px) {
+    .devices-grid {
+        grid-template-columns: 1fr;
+    }
+}
