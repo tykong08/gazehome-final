@@ -73,9 +73,9 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
             animate={{ left: displayX, top: displayY }}
             transition={{
                 type: 'spring',
-                stiffness: shouldFreeze ? 10000 : 20,  // 50 → 20 (훨씬 느리게)
-                damping: shouldFreeze ? 100 : 15,      // 25 → 15 (더 부드럽게)
-                mass: 2.5                               // 1.5 → 2.5 (관성 대폭 증가)
+                stiffness: shouldFreeze ? 10000 : 8,   // 20 → 8 (더욱 부드럽게)
+                damping: shouldFreeze ? 100 : 20,      // 15 → 20 (댐핑 증가로 떨림 방지)
+                mass: 3.0                               // 2.5 → 3.0 (관성 더 증가)
             }}
         >
             <div className="cursor-ring"></div>

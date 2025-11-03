@@ -60,11 +60,11 @@ function DeviceCard({ device, onControl }) {
     const cardRef = useRef(null)
     const statePollingRef = useRef(null)
 
-    // 👁️ Dwell Time 기능 (3초간 바라보면 토글 - 데모 최적화)
+    // 👁️ Dwell Time 기능 (2초간 바라보면 액션 실행)
     const [dwellingButton, setDwellingButton] = useState(null) // 현재 바라보는 버튼
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 3000 // 3초 (데모용 - 포인터 고정 시간 증가)
+    const DWELL_TIME = 2000 // 2초 (포인터 안정화 후 응시 시간 단축)
 
     // ============================================================================
     // 초기화: 액션 정보 로드
@@ -190,8 +190,13 @@ function DeviceCard({ device, onControl }) {
      * 👁️ Dwell Time 시작: 버튼에 시선이 머물 때
      */
     const handleButtonEnter = (actionName, actionInfo) => {
-        // 이미 액션 실행 중이거나 다른 버튼에서 dwell 진행 중이면 무시
-        if (isExecuting || dwellingButton) {
+        // 이미 타이머 진행 중이면 무시 (중복 방지)
+        if (dwellTimerRef.current) {
+            return
+        }
+        
+        // 액션 실행 중이면 무시
+        if (isExecuting) {
             return
         }
 
