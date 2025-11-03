@@ -1,10 +1,10 @@
-/* DeviceCard 컴포넌트 (v4) - 7인치 화면 최적화 */
+/* DeviceCard 컴포넌트 (v5) - 7인치 화면 초컴팩트 */
 
 .device-card {
     position: relative;
     background: white;
     border-radius: var(--radius-md);
-    padding: 8px;
+    padding: 6px;
     box-shadow: var(--shadow-sm);
     transition: all var(--transition-base);
     border: 2px solid transparent;
@@ -23,27 +23,27 @@
 .device-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
     border-bottom: 1px solid var(--gray-200);
 }
 
 .device-icon {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     color: white;
     flex-shrink: 0;
 }
 
 .device-icon svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
 }
 
 .device-info {
@@ -51,14 +51,14 @@
 }
 
 .device-info h3 {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--gray-900);
-    margin: 0 0 2px 0;
+    margin: 0 0 1px 0;
 }
 
 .device-info p {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--gray-500);
     margin: 0;
 }
@@ -69,15 +69,15 @@
 
 /* 기기 상태 */
 .device-state {
-    font-size: 0.6rem !important;
+    font-size: 0.55rem !important;
     color: var(--primary) !important;
     font-weight: 600;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 /* 새로고침 버튼 */
 .refresh-button {
-    padding: 4px;
+    padding: 3px;
     background: var(--gray-100);
     border: none;
     border-radius: var(--radius-sm);
@@ -87,8 +87,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: 24px;
+    min-height: 24px;
 }
 
 .refresh-button:hover {
@@ -101,21 +101,21 @@
     height: 14px;
 }
 
-/* 액션 섹션 */
+/* 액션 섹션 - 7인치 화면 최적화 */
 .device-actions-section {
-    max-height: 280px;
+    max-height: 320px;
     overflow-y: auto;
 }
 
 .loading-actions {
-    padding: 8px;
+    padding: 6px;
     text-align: center;
     color: var(--gray-500);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
 }
 
 .action-group {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .action-group:last-child {
@@ -123,20 +123,20 @@
 }
 
 .action-group-title {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 600;
     color: var(--gray-600);
     text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin: 0 0 6px 0;
-    padding-bottom: 3px;
+    letter-spacing: 0.2px;
+    margin: 0 0 4px 0;
+    padding-bottom: 2px;
     border-bottom: 1px solid var(--gray-200);
 }
 
 .action-buttons {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
 }
 
 /* 단일 액션이거나 홀수 개일 경우 전체 너비 사용 */
@@ -144,26 +144,26 @@
     grid-template-columns: 1fr;
 }
 
-/* 👁️ 시선 추적 최적화: 7인치 화면용 작은 버튼 */
+/* 👁️ 시선 추적 최적화: 7인치 화면용 초소형 버튼 */
 .action-button {
-    padding: 6px;
+    padding: 4px 2px;
     background: white;
     border: 2px solid;
     border-radius: var(--radius-sm);
     color: var(--gray-700);
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-base);
     text-align: center;
-    white-space: normal;
-    word-break: keep-all;
-    min-height: 40px;
-    min-width: 60px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 2px;
     position: relative;
     flex-direction: column;
 }
@@ -171,26 +171,27 @@
 /* 👁️ Dwell Time 진행 중 상태 - 시각적 피드백 강화 */
 .action-button.dwelling {
     animation: dwelling-pulse 0.8s ease-in-out infinite;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.4);
-    border-width: 3px;
-    transform: scale(1.05);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
+    border-width: 2px;
+    transform: scale(1.03);
 }
 
 @keyframes dwelling-pulse {
 
     0%,
     100% {
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
     }
 
     50% {
-        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.6);
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.6);
     }
 }
 
 .action-button svg {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
 }
 
 /* 액션 활성 상태 (마지막 클릭한 액션) */
@@ -344,21 +345,21 @@
     background: var(--gray-400);
 }
 
-/* 온도 조절 UI - 7인치 화면 최적화 */
+/* 온도 조절 UI - 7인치 화면 초컴팩트 */
 .temperature-control {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 8px;
+    gap: 6px;
+    padding: 6px;
     background: linear-gradient(135deg, #FFA07A20, #FF6B6B20);
     border-radius: var(--radius-sm);
     border: 2px solid #FFA07A;
 }
 
 .temp-button {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -369,7 +370,7 @@
     cursor: pointer;
     transition: all var(--transition-base);
     flex-shrink: 0;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
 }
 
@@ -401,18 +402,18 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    min-width: 50px;
+    gap: 2px;
+    min-width: 45px;
 }
 
 .temp-display svg {
     color: #FF6B6B;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 
 .temp-value {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: #FF6B6B;
     font-variant-numeric: tabular-nums;
