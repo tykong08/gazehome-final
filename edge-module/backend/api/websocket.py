@@ -199,12 +199,12 @@ async def websocket_control(websocket: WebSocket):
             command = data.get("command")
             
             if command == "start_calibration":
-                # TODO: 캘리브레이션 워크플로우 구현
+                # 캘리브레이션은 /calibration 페이지에서 처리됨
                 await websocket.send_json({
                     "type": "response",
                     "command": command,
-                    "status": "not_implemented",
-                    "message": "캘리브레이션 워크플로우가 아직 구현되지 않았습니다"
+                    "status": "use_calibration_page",
+                    "message": "보정은 /calibration 페이지를 이용해주세요"
                 })
             
             elif command == "load_calibration":

@@ -26,7 +26,7 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
     const prevBlinkRef = useRef(false)
     const [debounceTimer, setDebounceTimer] = useState(null)
     const shouldFreeze = blink || !calibrated
-    
+
     // 🧲 자석 효과: 버튼 중심 좌표 저장
     const [magnetTarget, setMagnetTarget] = useState(null)
     const magnetCheckIntervalRef = useRef(null)
@@ -49,20 +49,20 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
         magnetCheckIntervalRef.current = setInterval(() => {
             const currentX = x >= 0 ? x : lastValidPosRef.current.x
             const currentY = y >= 0 ? y : lastValidPosRef.current.y
-            
+
             // 현재 포인터 위치의 요소 가져오기
             const element = document.elementFromPoint(currentX, currentY)
-            
+
             if (element) {
                 // 버튼 또는 클릭 가능한 요소인지 확인
                 const isButton = element.tagName === 'BUTTON' ||
-                                element.classList.contains('action-button') ||
-                                element.classList.contains('temp-button') ||
-                                element.classList.contains('pagination-button') ||
-                                element.classList.contains('icon-button') ||
-                                element.classList.contains('refresh-button') ||
-                                element.closest('button')
-                
+                    element.classList.contains('action-button') ||
+                    element.classList.contains('temp-button') ||
+                    element.classList.contains('pagination-button') ||
+                    element.classList.contains('icon-button') ||
+                    element.classList.contains('refresh-button') ||
+                    element.closest('button')
+
                 if (isButton) {
                     // 버튼의 중심 좌표 계산
                     const targetElement = element.tagName === 'BUTTON' ? element : element.closest('button')
@@ -70,14 +70,14 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
                         const rect = targetElement.getBoundingClientRect()
                         const centerX = rect.left + rect.width / 2
                         const centerY = rect.top + rect.height / 2
-                        
+
                         // 자석 효과: 버튼 중심으로 스냅
                         setMagnetTarget({ x: centerX, y: centerY })
                         return
                     }
                 }
             }
-            
+
             // 버튼 영역 밖이면 자석 해제
             setMagnetTarget(null)
         }, 100) // 100ms마다 체크 (부드러운 전환)
@@ -121,11 +121,11 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
     if (!visible) return null
 
     // 🧲 자석 효과 적용: 버튼 중심 또는 실제 시선 위치
-    const displayX = magnetTarget 
-        ? magnetTarget.x 
+    const displayX = magnetTarget
+        ? magnetTarget.x
         : (shouldFreeze ? lastValidPosRef.current.x : x)
-    const displayY = magnetTarget 
-        ? magnetTarget.y 
+    const displayY = magnetTarget
+        ? magnetTarget.y
         : (shouldFreeze ? lastValidPosRef.current.y : y)
 
     return (

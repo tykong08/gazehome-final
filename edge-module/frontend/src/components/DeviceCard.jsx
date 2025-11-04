@@ -194,7 +194,7 @@ function DeviceCard({ device, onControl }) {
         if (dwellTimerRef.current) {
             return
         }
-        
+
         // 액션 실행 중이면 무시
         if (isExecuting) {
             return
@@ -345,11 +345,11 @@ function DeviceCard({ device, onControl }) {
                                                     : 'transparent'
                                             }}
                                         >
-                                            <Minus size={20} />
+                                            <Minus size={16} />
                                         </motion.button>
 
                                         <div className="temp-display">
-                                            <Thermometer size={24} />
+                                            <Thermometer size={14} />
                                             <span className="temp-value">{currentTemp}°C</span>
                                         </div>
 
@@ -374,7 +374,7 @@ function DeviceCard({ device, onControl }) {
                                                     : 'transparent'
                                             }}
                                         >
-                                            <Plus size={20} />
+                                            <Plus size={16} />
                                         </motion.button>
                                     </div>
                                 </div>

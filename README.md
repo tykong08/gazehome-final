@@ -11,9 +11,10 @@
   - WebGazeTracker (Ridge 모델, 9-point 보정)
   
 - **Frontend**: React + Vite (Port 5173)
-  - 3초 dwell time 기반 디바이스 제어
+  - 2초 dwell time 기반 디바이스 제어
   - 눈 깜빡임 감지 클릭
-  - 실시간 시선 커서 표시
+  - 실시간 시선 커서 표시 (자석 효과)
+  - 7인치 화면 최적화 (800×480)
 
 ### AI Services (AWS EC2)
 - 디바이스 추천 및 컨텍스트 분석
