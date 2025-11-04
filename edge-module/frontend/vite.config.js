@@ -12,7 +12,7 @@ export default defineConfig({
 
     // 개발 서버 설정
     server: {
-        port: 3000,
+        port: 5173,
         host: '0.0.0.0',  // 모든 네트워크 인터페이스에서 수신
         strictPort: true,  // 포트 충돌 시 오류 발생
         // 프록시 설정

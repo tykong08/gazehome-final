@@ -49,6 +49,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",        # 루프백 (Vite)
         "http://raspberrypi.local:3000", # 라즈베리파이 (mDNS)
         "http://raspberrypi.local:5173", # 라즈베리파이 (mDNS, Vite)
+        "http://raspberrypi:3000",       # 라즈베리파이 (호스트명)
+        "http://raspberrypi:5173",       # 라즈베리파이 (호스트명, Vite)
         "http://raspberrypi",            # 라즈베리파이 (호스트명)
     ]
     
