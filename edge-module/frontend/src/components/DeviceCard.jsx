@@ -11,6 +11,7 @@ import {
     getCategoryLabel,
     getActionColor,
 } from '../utils/deviceActions'
+import { registerGazeTarget } from '../utils/gazeRegistry'
 import './DeviceCard.css'
 
 /**
@@ -59,6 +60,8 @@ function DeviceCard({ device, onControl }) {
     const [currentTemp, setCurrentTemp] = useState(24) // 에어컨 온도 상태 (기본 24도)
     const cardRef = useRef(null)
     const statePollingRef = useRef(null)
+    const actionGazeCleanupRef = useRef(new Map())
+    const tempGazeCleanupRef = useRef({ minus: null, plus: null })
 
     // 👁️ Dwell Time 기능 (2초간 바라보면 액션 실행)
     const [dwellingButton, setDwellingButton] = useState(null) // 현재 바라보는 버튼
@@ -241,6 +244,77 @@ function DeviceCard({ device, onControl }) {
         setDwellProgress(0)
     }
 
+    const getActionButtonRef = (action) => (node) => {
+        const key = action.action
+        const cleanupMap = actionGazeCleanupRef.current
+        if (cleanupMap.has(key)) {
+            cleanupMap.get(key)()
+            cleanupMap.delete(key)
+        }
+
+        if (node) {
+            const cleanup = registerGazeTarget(node, {
+                onEnter: () => handleButtonEnter(action.action, action),
+                onLeave: handleButtonLeave
+            })
+            cleanupMap.set(key, cleanup)
+        }
+    }
+
+    const runTempMinusAction = () => {
+        const newTemp = Math.max(18, currentTemp - 1)
+        setCurrentTemp(newTemp)
+        handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
+    }
+
+    const runTempPlusAction = () => {
+        const newTemp = Math.min(30, currentTemp + 1)
+        setCurrentTemp(newTemp)
+        handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
+    }
+
+    const startTempMinusDwell = () => {
+        handleButtonEnter('temp_minus', {
+            callback: runTempMinusAction
+        })
+    }
+
+    const startTempPlusDwell = () => {
+        handleButtonEnter('temp_plus', {
+            callback: runTempPlusAction
+        })
+    }
+
+    const setTempMinusRef = (node) => {
+        const cleanupStore = tempGazeCleanupRef.current
+        if (cleanupStore.minus) {
+            cleanupStore.minus()
+            cleanupStore.minus = null
+        }
+
+        if (node) {
+            cleanupStore.minus = registerGazeTarget(node, {
+                onEnter: startTempMinusDwell,
+                onLeave: handleButtonLeave
+            })
+        }
+    }
+
+    const setTempPlusRef = (node) => {
+        const cleanupStore = tempGazeCleanupRef.current
+        if (cleanupStore.plus) {
+            cleanupStore.plus()
+            cleanupStore.plus = null
+        }
+
+        if (node) {
+            cleanupStore.plus = registerGazeTarget(node, {
+                onEnter: startTempPlusDwell,
+                onLeave: handleButtonLeave
+            })
+        }
+    }
+
     // 컴포넌트 언마운트 시 타이머 정리
     useEffect(() => {
         return () => {
@@ -325,16 +399,9 @@ function DeviceCard({ device, onControl }) {
                                     <h4 className="action-group-title">{getCategoryLabel(category)}</h4>
                                     <div className="temperature-control">
                                         <motion.button
+                                            ref={setTempMinusRef}
                                             className={`temp-button ${dwellingButton === 'temp_minus' ? 'dwelling' : ''}`}
-                                            onMouseEnter={() => {
-                                                const newTemp = Math.max(18, currentTemp - 1)
-                                                handleButtonEnter('temp_minus', {
-                                                    callback: () => {
-                                                        setCurrentTemp(newTemp)
-                                                        handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
-                                                    }
-                                                })
-                                            }}
+                                            onMouseEnter={startTempMinusDwell}
                                             onMouseLeave={handleButtonLeave}
                                             disabled={isExecuting || currentTemp <= 18}
                                             whileHover={{ scale: isExecuting || currentTemp <= 18 ? 1 : 1.1 }}
@@ -354,16 +421,9 @@ function DeviceCard({ device, onControl }) {
                                         </div>
 
                                         <motion.button
+                                            ref={setTempPlusRef}
                                             className={`temp-button ${dwellingButton === 'temp_plus' ? 'dwelling' : ''}`}
-                                            onMouseEnter={() => {
-                                                const newTemp = Math.min(30, currentTemp + 1)
-                                                handleButtonEnter('temp_plus', {
-                                                    callback: () => {
-                                                        setCurrentTemp(newTemp)
-                                                        handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
-                                                    }
-                                                })
-                                            }}
+                                            onMouseEnter={startTempPlusDwell}
                                             onMouseLeave={handleButtonLeave}
                                             disabled={isExecuting || currentTemp >= 30}
                                             whileHover={{ scale: isExecuting || currentTemp >= 30 ? 1 : 1.1 }}
@@ -394,6 +454,7 @@ function DeviceCard({ device, onControl }) {
 
                                         return (
                                             <motion.button
+                                                ref={getActionButtonRef(action)}
                                                 key={action.action}
                                                 className={`action-button ${isActive ? 'active' : ''} ${isDwelling ? 'dwelling' : ''}`}
                                                 onMouseEnter={() => handleButtonEnter(action.action, action)}

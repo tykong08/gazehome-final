@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, AlertCircle, CheckCircle } from 'lucide-react'
 import './RecommendationModal.css'
+import { registerGazeTarget } from '../utils/gazeRegistry'
 
 /**
  * AI 추천 모달 컴포넌트
@@ -33,6 +34,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
     const DWELL_TIME = 3000 // 3초 (데모용 - 포인터 고정 시간 증가)
+    const gazeCleanupRef = useRef({ accept: null, reject: null })
 
     // 최상위 추천 (단일 추천)
     const topRecommendation = recommendations[0]
@@ -140,6 +142,45 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
         setDwellProgress(0)
     }
 
+    const startAcceptDwell = () => {
+        if (!topRecommendation) return
+        handleButtonEnter('accept', () => onAccept(topRecommendation), true)
+    }
+
+    const startRejectDwell = () => {
+        handleButtonEnter('reject', () => onClose(), false)
+    }
+
+    const setAcceptButtonRef = (node) => {
+        const cleanupStore = gazeCleanupRef.current
+        if (cleanupStore.accept) {
+            cleanupStore.accept()
+            cleanupStore.accept = null
+        }
+
+        if (node) {
+            cleanupStore.accept = registerGazeTarget(node, {
+                onEnter: startAcceptDwell,
+                onLeave: handleButtonLeave
+            })
+        }
+    }
+
+    const setRejectButtonRef = (node) => {
+        const cleanupStore = gazeCleanupRef.current
+        if (cleanupStore.reject) {
+            cleanupStore.reject()
+            cleanupStore.reject = null
+        }
+
+        if (node) {
+            cleanupStore.reject = registerGazeTarget(node, {
+                onEnter: startRejectDwell,
+                onLeave: handleButtonLeave
+            })
+        }
+    }
+
     // 컴포넌트 언마운트시 타이머 정리
     useEffect(() => {
         return () => {
@@ -231,8 +272,9 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
                     {/* 액션 버튼 - YES / NO */}
                     <div className="modal-actions">
                         <button
+                            ref={setAcceptButtonRef}
                             className={`action-button accept ${dwellingButton === 'accept' ? 'dwelling' : ''}`}
-                            onMouseEnter={() => handleButtonEnter('accept', () => onAccept(topRecommendation), true)}
+                            onMouseEnter={startAcceptDwell}
                             onMouseLeave={handleButtonLeave}
                             disabled={isLocked}
                             style={{
@@ -258,8 +300,9 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
                             )}
                         </button>
                         <button
+                            ref={setRejectButtonRef}
                             className={`action-button reject ${dwellingButton === 'reject' ? 'dwelling' : ''}`}
-                            onMouseEnter={() => handleButtonEnter('reject', () => onClose(), false)}
+                            onMouseEnter={startRejectDwell}
                             onMouseLeave={handleButtonLeave}
                             disabled={isLocked}
                             style={{

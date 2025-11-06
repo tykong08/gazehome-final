@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Eye, LogOut, Settings, Sparkles,
@@ -8,6 +8,7 @@ import GazeCursor from '../components/GazeCursor'
 import DeviceCard from '../components/DeviceCard'
 import RecommendationModal from '../components/RecommendationModal'
 import './HomePage.css'
+import { resolveGazeTarget, registerGazeTarget } from '../utils/gazeRegistry'
 
 /**
  * 홈 페이지 (메인 대시보드)
@@ -40,6 +41,23 @@ function HomePage({ onLogout }) {
     const [isPointerLocked, setIsPointerLocked] = useState(false)
     // 🔒 현재 제어 중인 기기 (중복 클릭 방지)
     const [controllingDevice, setControllingDevice] = useState(null)
+    const [stableCursor, setStableCursor] = useState(() => {
+        if (typeof window === 'undefined') {
+            return { x: 0, y: 0, frozen: true, magnetized: false }
+        }
+        return {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+            frozen: true,
+            magnetized: false
+        }
+    })
+
+    const activeGazeTargetRef = useRef({ element: null, handlers: null })
+    const paginationTimerRef = useRef(null)
+    const paginationCleanupRef = useRef({ prev: null, next: null })
+    const [paginationDwelling, setPaginationDwelling] = useState(null)
+    const [paginationProgress, setPaginationProgress] = useState(0)
 
     // 📄 페이지네이션 - 한 번에 1개 기기만 표시
     // 고정 기기 ID (에어컨1, 공기청정기 - 에어컨이 1페이지에 표시)
@@ -62,6 +80,84 @@ function HomePage({ onLogout }) {
         }, duration)
     }
 
+    const cancelPaginationDwell = useCallback(() => {
+        if (paginationTimerRef.current) {
+            clearInterval(paginationTimerRef.current)
+            paginationTimerRef.current = null
+        }
+        setPaginationDwelling(null)
+        setPaginationProgress(0)
+    }, [])
+
+    const clearGazeTarget = useCallback(() => {
+        cancelPaginationDwell()
+        const current = activeGazeTargetRef.current
+        if (current.element && current.handlers?.onLeave) {
+            current.handlers.onLeave()
+        }
+        activeGazeTargetRef.current = { element: null, handlers: null }
+    }, [cancelPaginationDwell])
+
+    const startPaginationDwell = useCallback((buttonType, callback) => {
+        if (paginationTimerRef.current || isPointerLocked) {
+            return
+        }
+
+        setPaginationDwelling(buttonType)
+        setPaginationProgress(0)
+
+        const startTime = Date.now()
+        paginationTimerRef.current = setInterval(() => {
+            const elapsed = Date.now() - startTime
+            const progress = Math.min((elapsed / 2000) * 100, 100)
+            setPaginationProgress(progress)
+
+            if (progress >= 100) {
+                clearInterval(paginationTimerRef.current)
+                paginationTimerRef.current = null
+                setPaginationDwelling(null)
+                setPaginationProgress(0)
+                callback()
+                lockPointer()
+            }
+        }, 50)
+    }, [isPointerLocked])
+
+    const updateGazeTarget = useCallback((cursorX, cursorY) => {
+        const element = document.elementFromPoint(cursorX, cursorY)
+        const resolved = resolveGazeTarget(element)
+        const current = activeGazeTargetRef.current
+
+        const nextElement = resolved?.element ?? null
+        if (current.element === nextElement) {
+            return
+        }
+
+        if (current.element && current.handlers?.onLeave) {
+            current.handlers.onLeave()
+        }
+
+        if (resolved?.handlers?.onEnter) {
+            resolved.handlers.onEnter()
+        }
+
+        activeGazeTargetRef.current = resolved || { element: null, handlers: null }
+    }, [])
+
+    const handleStableCursorUpdate = useCallback((position) => {
+        setStableCursor((prev) => {
+            if (
+                Math.abs(prev.x - position.x) < 0.25 &&
+                Math.abs(prev.y - position.y) < 0.25 &&
+                prev.frozen === position.frozen &&
+                prev.magnetized === position.magnetized
+            ) {
+                return prev
+            }
+            return position
+        })
+    }, [])
+
     /**
      * 📄 고정 기기만 필터링 (에어컨1, 공기청정기)
      * 페이지네이션: 현재 인덱스의 기기만 표시
@@ -76,20 +172,50 @@ function HomePage({ onLogout }) {
         : []
 
     // 다음 버튼 핸들러
-    const handleNextDevice = () => {
+    const handleNextDevice = useCallback(() => {
+        cancelPaginationDwell()
         if (fixedDevices.length > 0) {
             setCurrentDeviceIndex((prev) => (prev + 1) % fixedDevices.length)
         }
-    }
+    }, [cancelPaginationDwell, fixedDevices.length])
 
     // 이전 버튼 핸들러
-    const handlePrevDevice = () => {
+    const handlePrevDevice = useCallback(() => {
+        cancelPaginationDwell()
         if (fixedDevices.length > 0) {
             setCurrentDeviceIndex((prev) =>
                 prev === 0 ? fixedDevices.length - 1 : prev - 1
             )
         }
-    }
+    }, [cancelPaginationDwell, fixedDevices.length])
+
+    const makePaginationButtonRef = useCallback((type, callback) => (node) => {
+        const store = paginationCleanupRef.current
+        if (store[type]) {
+            store[type]()
+            store[type] = null
+        }
+
+        if (node) {
+            store[type] = registerGazeTarget(node, {
+                onEnter: () => {
+                    if (node.disabled) return
+                    startPaginationDwell(type, callback)
+                },
+                onLeave: cancelPaginationDwell
+            })
+        }
+    }, [startPaginationDwell, cancelPaginationDwell])
+
+    const prevButtonRef = useMemo(
+        () => makePaginationButtonRef('prev', handlePrevDevice),
+        [makePaginationButtonRef, handlePrevDevice]
+    )
+
+    const nextButtonRef = useMemo(
+        () => makePaginationButtonRef('next', handleNextDevice),
+        [makePaginationButtonRef, handleNextDevice]
+    )
 
     /**
      * 초기화: 사용자명 로드, 기기/추천 로드, WebSocket 연결
@@ -351,6 +477,20 @@ function HomePage({ onLogout }) {
         }
     }
 
+    useEffect(() => {
+        if (isPointerLocked || !calibrated || blink || stableCursor.frozen) {
+            clearGazeTarget()
+            return
+        }
+
+        if (stableCursor.x >= 0 && stableCursor.y >= 0) {
+            updateGazeTarget(stableCursor.x, stableCursor.y)
+        }
+    }, [stableCursor, blink, calibrated, isPointerLocked, updateGazeTarget, clearGazeTarget])
+
+    useEffect(() => () => clearGazeTarget(), [clearGazeTarget])
+    useEffect(() => () => cancelPaginationDwell(), [cancelPaginationDwell])
+
     /**
      * 기기 제어
      * @param {string} deviceId - 기기 ID
@@ -440,7 +580,14 @@ function HomePage({ onLogout }) {
                 보정 상태(calibrated)가 true일 때도 표시되도록 합니다.
                 이 변경은 개발/디버깅 시 포인터가 보이지 않는 문제를 완화합니다.
             */}
-            <GazeCursor x={gazePosition.x} y={gazePosition.y} visible={isConnected || calibrated} blink={blink} calibrated={calibrated} />
+            <GazeCursor
+                x={gazePosition.x}
+                y={gazePosition.y}
+                visible={isConnected || calibrated}
+                blink={blink}
+                calibrated={calibrated}
+                onStablePosition={handleStableCursorUpdate}
+            />
 
             {/* 헤더 */}
             <header className="home-header">
@@ -531,12 +678,35 @@ function HomePage({ onLogout }) {
                                 <div className="pagination-controls">
                                     {/* 이전 버튼 */}
                                     <button
-                                        className="pagination-button prev"
+                                        ref={prevButtonRef}
+                                        className={`pagination-button prev ${paginationDwelling === 'prev' ? 'dwelling' : ''}`}
+                                        onMouseEnter={() => startPaginationDwell('prev', handlePrevDevice)}
+                                        onMouseLeave={cancelPaginationDwell}
                                         onClick={handlePrevDevice}
                                         disabled={fixedDevices.length === 1}
+                                        style={{
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            background: paginationDwelling === 'prev'
+                                                ? `linear-gradient(to right, var(--primary) ${paginationProgress}%, transparent ${paginationProgress}%)`
+                                                : undefined
+                                        }}
                                     >
                                         <ChevronLeft size={32} />
                                         이전
+                                        {paginationDwelling === 'prev' && (
+                                            <span
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: '4px',
+                                                    left: 0,
+                                                    height: '4px',
+                                                    width: `${paginationProgress}%`,
+                                                    backgroundColor: 'var(--primary)',
+                                                    transition: 'width 50ms linear'
+                                                }}
+                                            />
+                                        )}
                                     </button>
 
                                     {/* 페이지 인디케이터 */}
@@ -549,12 +719,35 @@ function HomePage({ onLogout }) {
 
                                     {/* 다음 버튼 */}
                                     <button
-                                        className="pagination-button next"
+                                        ref={nextButtonRef}
+                                        className={`pagination-button next ${paginationDwelling === 'next' ? 'dwelling' : ''}`}
+                                        onMouseEnter={() => startPaginationDwell('next', handleNextDevice)}
+                                        onMouseLeave={cancelPaginationDwell}
                                         onClick={handleNextDevice}
                                         disabled={fixedDevices.length === 1}
+                                        style={{
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            background: paginationDwelling === 'next'
+                                                ? `linear-gradient(to right, var(--primary) ${paginationProgress}%, transparent ${paginationProgress}%)`
+                                                : undefined
+                                        }}
                                     >
                                         다음
                                         <ChevronRight size={32} />
+                                        {paginationDwelling === 'next' && (
+                                            <span
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: '4px',
+                                                    left: 0,
+                                                    height: '4px',
+                                                    width: `${paginationProgress}%`,
+                                                    backgroundColor: 'var(--primary)',
+                                                    transition: 'width 50ms linear'
+                                                }}
+                                            />
+                                        )}
                                     </button>
                                 </div>
 
