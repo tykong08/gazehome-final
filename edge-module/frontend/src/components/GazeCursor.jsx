@@ -89,34 +89,34 @@ function GazeCursor({ x, y, visible, blink = false, calibrated = true }) {
         }
     }, [x, y, shouldFreeze])
 
-    // 👁️ 깜빡임 끝남 감지 → 시선 위치 요소 클릭 (50ms 디바운싱)
-    useEffect(() => {
-        // blink: true → false 전환만 감지 (깜빡임 완료)
-        if (!blink && prevBlinkRef.current && !debounceTimer) {
-            // 50ms 디바운싱: 과도한 호출 방지
-            const timer = setTimeout(() => {
-                const element = document.elementFromPoint(
-                    lastValidPosRef.current.x,
-                    lastValidPosRef.current.y
-                )
+    // 👁️ 깜빡임 클릭 비활성화 - 오직 2초 응시만 사용
+    // useEffect(() => {
+    //     // blink: true → false 전환만 감지 (깜빡임 완료)
+    //     if (!blink && prevBlinkRef.current && !debounceTimer) {
+    //         // 50ms 디바운싱: 과도한 호출 방지
+    //         const timer = setTimeout(() => {
+    //             const element = document.elementFromPoint(
+    //                 lastValidPosRef.current.x,
+    //                 lastValidPosRef.current.y
+    //             )
 
-                if (element && element !== document.body && element !== document.documentElement) {
-                    console.log('[GazeCursor] 깜빡임 클릭 감지:', element.className)
-                    element.click()
-                }
+    //             if (element && element !== document.body && element !== document.documentElement) {
+    //                 console.log('[GazeCursor] 깜빡임 클릭 감지:', element.className)
+    //                 element.click()
+    //             }
 
-                setDebounceTimer(null)
-            }, 50)
+    //             setDebounceTimer(null)
+    //         }, 50)
 
-            setDebounceTimer(timer)
-        }
+    //         setDebounceTimer(timer)
+    //     }
 
-        prevBlinkRef.current = blink
+    //     prevBlinkRef.current = blink
 
-        return () => {
-            if (debounceTimer) clearTimeout(debounceTimer)
-        }
-    }, [blink, debounceTimer])
+    //     return () => {
+    //         if (debounceTimer) clearTimeout(debounceTimer)
+    //     }
+    // }, [blink, debounceTimer])
 
     if (!visible) return null
 
