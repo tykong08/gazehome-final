@@ -59,7 +59,7 @@ function HomePage({ onLogout }) {
     const [paginationDwelling, setPaginationDwelling] = useState(null)
     const [paginationProgress, setPaginationProgress] = useState(0)
     const GAZE_STICKY_MARGIN = 35
-    const GAZE_EXIT_DELAY_MS = 180
+    const GAZE_EXIT_DELAY_MS = 320
 
     // 📄 페이지네이션 - 한 번에 1개 기기만 표시
     // 고정 기기 ID (에어컨1, 공기청정기 - 에어컨이 1페이지에 표시)
@@ -115,7 +115,7 @@ function HomePage({ onLogout }) {
         const startTime = Date.now()
         paginationTimerRef.current = setInterval(() => {
             const elapsed = Date.now() - startTime
-            const progress = Math.min((elapsed / 2000) * 100, 100)
+            const progress = Math.min((elapsed / 1500) * 100, 100)
             setPaginationProgress(progress)
 
             if (progress >= 100) {
@@ -623,6 +623,7 @@ function HomePage({ onLogout }) {
         }
 
         setShowRecommendations(false)
+        setRecommendations([])
     }
 
     return (

@@ -33,7 +33,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     const [dwellingButton, setDwellingButton] = useState(null) // 'accept' 또는 'reject'
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 1000 // 1초 응시로 선택 확정
+    const DWELL_TIME = 1500 // 1.5초 응시로 선택 확정
     const gazeCleanupRef = useRef({ accept: null, reject: null })
 
     // 최상위 추천 (단일 추천)

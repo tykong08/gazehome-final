@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
     Power, PowerOff, Wind, Sun, Droplets,
@@ -57,17 +57,21 @@ function DeviceCard({ device, onControl }) {
     const [deviceState, setDeviceState] = useState({})
     const [lastAction, setLastAction] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [currentTemp, setCurrentTemp] = useState(24) // 에어컨 온도 상태 (기본 24도)
+    const [currentTemp, setCurrentTemp] = useState(() => {
+        const initial = Number(device?.current_temperature || device?.target_temp)
+        return Number.isFinite(initial) ? initial : 24
+    })
     const cardRef = useRef(null)
     const statePollingRef = useRef(null)
     const actionGazeCleanupRef = useRef(new Map())
+    const actionDwellCallbacksRef = useRef(new Map())
     const tempGazeCleanupRef = useRef({ minus: null, plus: null })
 
     // 👁️ Dwell Time 기능 (2초간 바라보면 액션 실행)
     const [dwellingButton, setDwellingButton] = useState(null) // 현재 바라보는 버튼
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 1000 // 1초 응시로 액션 실행
+    const DWELL_TIME = 1500 // 1.5초 응시로 액션 실행
 
     // ============================================================================
     // 초기화: 액션 정보 로드
@@ -82,6 +86,13 @@ function DeviceCard({ device, onControl }) {
             }
         }
     }, [device.device_id, device.device_type])
+
+    useEffect(() => {
+        const nextTemp = Number(deviceState?.target_temp ?? deviceState?.current_temperature)
+        if (Number.isFinite(nextTemp) && nextTemp !== currentTemp) {
+            setCurrentTemp(nextTemp)
+        }
+    }, [deviceState?.target_temp, deviceState?.current_temperature, currentTemp])
 
     /**
      * 디바이스 액션 정보 로드
@@ -247,39 +258,70 @@ function DeviceCard({ device, onControl }) {
     const getActionButtonRef = (action) => (node) => {
         const key = action.action
         const cleanupMap = actionGazeCleanupRef.current
+        const dwellMap = actionDwellCallbacksRef.current
+
         if (cleanupMap.has(key)) {
             cleanupMap.get(key)()
             cleanupMap.delete(key)
         }
 
         if (node) {
+            const enterHandler = () => {
+                if (!node || node.disabled) {
+                    handleButtonLeave()
+                    return
+                }
+                handleButtonEnter(action.action, action)
+            }
+
+            dwellMap.set(key, enterHandler)
+
             const cleanup = registerGazeTarget(node, {
-                onEnter: () => handleButtonEnter(action.action, action),
+                onEnter: enterHandler,
                 onLeave: handleButtonLeave
             })
             cleanupMap.set(key, cleanup)
+        } else {
+            dwellMap.delete(key)
         }
     }
 
+    useEffect(() => {
+        const nextTemp = Number(deviceState?.target_temp)
+        if (Number.isFinite(nextTemp) && nextTemp !== currentTemp) {
+            setCurrentTemp(nextTemp)
+        }
+    }, [deviceState?.target_temp])
+
     const runTempMinusAction = () => {
+        if (!isDevicePowered || isExecuting) return
         const newTemp = Math.max(18, currentTemp - 1)
         setCurrentTemp(newTemp)
         handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
     }
 
     const runTempPlusAction = () => {
+        if (!isDevicePowered || isExecuting) return
         const newTemp = Math.min(30, currentTemp + 1)
         setCurrentTemp(newTemp)
         handleActionClick(`temp_${newTemp}`, { name: `${newTemp}°C`, type: 'temperature' })
     }
 
     const startTempMinusDwell = () => {
+        if (!isDevicePowered || isExecuting || currentTemp <= 18) {
+            handleButtonLeave()
+            return
+        }
         handleButtonEnter('temp_minus', {
             callback: runTempMinusAction
         })
     }
 
     const startTempPlusDwell = () => {
+        if (!isDevicePowered || isExecuting || currentTemp >= 30) {
+            handleButtonLeave()
+            return
+        }
         handleButtonEnter('temp_plus', {
             callback: runTempPlusAction
         })
@@ -329,6 +371,21 @@ function DeviceCard({ device, onControl }) {
 
     // 액션을 카테고리별로 그룹화
     const groupedActions = groupActionsByCategory(actions)
+    const sortedCategories = useMemo(() => {
+        const entries = Object.entries(groupedActions)
+        entries.sort(([a], [b]) => {
+            if (device.device_type.toLowerCase().includes('aircon')) {
+                if (a === 'temperature' && b === 'wind_strength') return -1
+                if (a === 'wind_strength' && b === 'temperature') return 1
+            }
+            return a.localeCompare(b)
+        })
+        return entries
+    }, [groupedActions, device.device_type])
+    const isDevicePowered = useMemo(() => {
+        const raw = (deviceState?.power ?? deviceState?.state ?? device?.state ?? '').toString().toLowerCase()
+        return ['on', 'power_on', 'running', 'true', '1', 'enabled'].includes(raw)
+    }, [deviceState?.power, deviceState?.state, device?.state])
 
     // 현재 상태 표시 텍스트
     const getStateDisplay = () => {
@@ -391,7 +448,7 @@ function DeviceCard({ device, onControl }) {
                         <p>액션 로드 중...</p>
                     </div>
                 ) : Object.keys(groupedActions).length > 0 ? (
-                    Object.entries(groupedActions).map(([category, categoryActions]) => {
+                    sortedCategories.map(([category, categoryActions]) => {
                         // 온도 카테고리는 +/- 버튼으로 렌더링
                         if (category === 'temperature') {
                             return (
@@ -403,9 +460,9 @@ function DeviceCard({ device, onControl }) {
                                             className={`temp-button ${dwellingButton === 'temp_minus' ? 'dwelling' : ''}`}
                                             onMouseEnter={startTempMinusDwell}
                                             onMouseLeave={handleButtonLeave}
-                                            disabled={isExecuting || currentTemp <= 18}
-                                            whileHover={{ scale: isExecuting || currentTemp <= 18 ? 1 : 1.1 }}
-                                            whileTap={{ scale: isExecuting || currentTemp <= 18 ? 1 : 0.9 }}
+                                            disabled={isExecuting || currentTemp <= 18 || !isDevicePowered}
+                                            whileHover={{ scale: (isExecuting || currentTemp <= 18 || !isDevicePowered) ? 1 : 1.1 }}
+                                            whileTap={{ scale: (isExecuting || currentTemp <= 18 || !isDevicePowered) ? 1 : 0.9 }}
                                             style={{
                                                 background: dwellingButton === 'temp_minus'
                                                     ? `linear-gradient(to right, var(--primary) ${dwellProgress}%, transparent ${dwellProgress}%)`
@@ -425,9 +482,9 @@ function DeviceCard({ device, onControl }) {
                                             className={`temp-button ${dwellingButton === 'temp_plus' ? 'dwelling' : ''}`}
                                             onMouseEnter={startTempPlusDwell}
                                             onMouseLeave={handleButtonLeave}
-                                            disabled={isExecuting || currentTemp >= 30}
-                                            whileHover={{ scale: isExecuting || currentTemp >= 30 ? 1 : 1.1 }}
-                                            whileTap={{ scale: isExecuting || currentTemp >= 30 ? 1 : 0.9 }}
+                                            disabled={isExecuting || currentTemp >= 30 || !isDevicePowered}
+                                            whileHover={{ scale: (isExecuting || currentTemp >= 30 || !isDevicePowered) ? 1 : 1.1 }}
+                                            whileTap={{ scale: (isExecuting || currentTemp >= 30 || !isDevicePowered) ? 1 : 0.9 }}
                                             style={{
                                                 background: dwellingButton === 'temp_plus'
                                                     ? `linear-gradient(to right, var(--primary) ${dwellProgress}%, transparent ${dwellProgress}%)`
@@ -451,17 +508,26 @@ function DeviceCard({ device, onControl }) {
                                         const actionColor = getActionColor(action.type)
                                         const isActive = lastAction?.name === action.action && lastAction?.status === 'success'
                                         const isDwelling = dwellingButton === action.action
+                                        const actionType = (action.type || '').toLowerCase()
+                                        const isPowerAction = actionType === 'power'
+                                        const isActionEnabled = isPowerAction || isDevicePowered
+                                        const isDisabled = isExecuting || !isActionEnabled
 
                                         return (
                                             <motion.button
                                                 ref={getActionButtonRef(action)}
                                                 key={action.action}
                                                 className={`action-button ${isActive ? 'active' : ''} ${isDwelling ? 'dwelling' : ''}`}
-                                                onMouseEnter={() => handleButtonEnter(action.action, action)}
+                                                onMouseEnter={() => {
+                                                    const handler = actionDwellCallbacksRef.current.get(action.action)
+                                                    if (handler) {
+                                                        handler()
+                                                    }
+                                                }}
                                                 onMouseLeave={handleButtonLeave}
-                                                disabled={isExecuting}
-                                                whileHover={{ scale: isExecuting ? 1 : 1.05 }}
-                                                whileTap={{ scale: isExecuting ? 1 : 0.95 }}
+                                                disabled={isDisabled}
+                                                whileHover={{ scale: isDisabled ? 1 : 1.05 }}
+                                                whileTap={{ scale: isDisabled ? 1 : 0.95 }}
                                                 style={{
                                                     borderColor: actionColor,
                                                     backgroundColor: isActive ? actionColor + '20' : 'transparent',

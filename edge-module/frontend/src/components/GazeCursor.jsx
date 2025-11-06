@@ -32,7 +32,7 @@ function GazeCursor({
     const magnetCheckIntervalRef = useRef(null)
     const entryFreezeUntilRef = useRef(0)
     const prevMagnetTargetRef = useRef(null)
-    const ENTRY_FREEZE_MS = 500
+    const ENTRY_FREEZE_MS = 200
 
     const shouldFreeze = blink || !calibrated
 
