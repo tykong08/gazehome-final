@@ -682,6 +682,7 @@ function CalibrationPage({ onComplete }) {
                         <CalibrationPoint
                             x={currentPoint.x}
                             y={currentPoint.y}
+                            index={currentPoint.index}
                             phase={phase}
                             progress={samplesCollected / samplesPerPoint}
                             hasFace={hasFace}
@@ -821,13 +822,22 @@ function CalibrationPage({ onComplete }) {
  * 1. 백엔드 변경: backend/api/calibration.py의 nine_point_calibration 함수 수정
  * 2. 프론트엔드 변경: 아래 offset 추가
  */
-function CalibrationPoint({ x, y, phase, progress, hasFace }) {
-    // ⚙️ 포인터 위치 미세 조정 (픽셀 단위)
-    const OFFSET_X = 0  // 좌우 조정: 음수 = 좌측, 양수 = 우측
-    const OFFSET_Y = 0  // 상하 조정: 음수 = 상단, 양수 = 하단
+function CalibrationPoint({ x, y, index, phase, progress, hasFace }) {
+    // ⚙️ 7inch 디스플레이 보정용 포인트 오프셋
+    const OFFSET_X_MAP = {
+        1: 24,
+        2: 20,
+        4: 18,
+        5: 18,
+        7: 16,
+        8: 20
+    }
 
-    const adjustedX = x + OFFSET_X
-    const adjustedY = y + OFFSET_Y
+    const offsetX = OFFSET_X_MAP[index] || 0
+    const offsetY = 0
+
+    const adjustedX = x + offsetX
+    const adjustedY = y + offsetY
 
     // 기본 반경
     const baseRadius = 20

@@ -67,7 +67,7 @@ function DeviceCard({ device, onControl }) {
     const [dwellingButton, setDwellingButton] = useState(null) // 현재 바라보는 버튼
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 2000 // 2초 (포인터 안정화 후 응시 시간 단축)
+    const DWELL_TIME = 1000 // 1초 응시로 액션 실행
 
     // ============================================================================
     // 초기화: 액션 정보 로드

@@ -94,32 +94,6 @@ PURIFIER_ACTIONS = {
         "icon": "Wind",
         "value": "power",
     },
-    
-    # 실행 모드
-    "circulator": {
-        "name": "순환 모드",
-        "description": "공기청정기를 순환 모드로 설정합니다",
-        "type": ActionType.MODE,
-        "category": "operation_mode",
-        "icon": "Repeat",
-        "value": "circulator",
-    },
-    "clean": {
-        "name": "청정 모드",
-        "description": "공기청정기를 청정 모드로 설정합니다",
-        "type": ActionType.MODE,
-        "category": "operation_mode",
-        "icon": "Leaf",
-        "value": "clean",
-    },
-    "auto": {
-        "name": "자동 모드",
-        "description": "공기청정기를 자동 모드로 설정합니다",
-        "type": ActionType.MODE,
-        "category": "operation_mode",
-        "icon": "Zap",
-        "value": "auto",
-    },
 }
 
 

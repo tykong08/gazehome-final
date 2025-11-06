@@ -53,11 +53,13 @@ function HomePage({ onLogout }) {
         }
     })
 
-    const activeGazeTargetRef = useRef({ element: null, handlers: null })
+    const activeGazeTargetRef = useRef({ element: null, handlers: null, exitTimeout: null })
     const paginationTimerRef = useRef(null)
     const paginationCleanupRef = useRef({ prev: null, next: null })
     const [paginationDwelling, setPaginationDwelling] = useState(null)
     const [paginationProgress, setPaginationProgress] = useState(0)
+    const GAZE_STICKY_MARGIN = 35
+    const GAZE_EXIT_DELAY_MS = 180
 
     // 📄 페이지네이션 - 한 번에 1개 기기만 표시
     // 고정 기기 ID (에어컨1, 공기청정기 - 에어컨이 1페이지에 표시)
@@ -92,10 +94,14 @@ function HomePage({ onLogout }) {
     const clearGazeTarget = useCallback(() => {
         cancelPaginationDwell()
         const current = activeGazeTargetRef.current
+        if (current.exitTimeout) {
+            clearTimeout(current.exitTimeout)
+            current.exitTimeout = null
+        }
         if (current.element && current.handlers?.onLeave) {
             current.handlers.onLeave()
         }
-        activeGazeTargetRef.current = { element: null, handlers: null }
+        activeGazeTargetRef.current = { element: null, handlers: null, exitTimeout: null }
     }, [cancelPaginationDwell])
 
     const startPaginationDwell = useCallback((buttonType, callback) => {
@@ -124,25 +130,72 @@ function HomePage({ onLogout }) {
     }, [isPointerLocked])
 
     const updateGazeTarget = useCallback((cursorX, cursorY) => {
-        const element = document.elementFromPoint(cursorX, cursorY)
-        const resolved = resolveGazeTarget(element)
         const current = activeGazeTargetRef.current
 
-        const nextElement = resolved?.element ?? null
-        if (current.element === nextElement) {
+        const clearExitTimer = () => {
+            if (current.exitTimeout) {
+                clearTimeout(current.exitTimeout)
+                current.exitTimeout = null
+            }
+        }
+
+        const scheduleExit = () => {
+            if (current.exitTimeout) {
+                return
+            }
+            current.exitTimeout = setTimeout(() => {
+                if (current.handlers?.onLeave) {
+                    current.handlers.onLeave()
+                }
+                activeGazeTargetRef.current = { element: null, handlers: null, exitTimeout: null }
+            }, GAZE_EXIT_DELAY_MS)
+        }
+
+        const isWithinStickyZone = () => {
+            if (!current.element) {
+                return false
+            }
+            const rect = current.element.getBoundingClientRect()
+            return (
+                cursorX >= rect.left - GAZE_STICKY_MARGIN &&
+                cursorX <= rect.right + GAZE_STICKY_MARGIN &&
+                cursorY >= rect.top - GAZE_STICKY_MARGIN &&
+                cursorY <= rect.bottom + GAZE_STICKY_MARGIN
+            )
+        }
+
+        const element = document.elementFromPoint(cursorX, cursorY)
+        const resolved = resolveGazeTarget(element)
+
+        if (resolved?.element === current.element) {
+            clearExitTimer()
+            return
+        }
+
+        if (!resolved?.element) {
+            if (isWithinStickyZone()) {
+                clearExitTimer()
+                return
+            }
+            scheduleExit()
             return
         }
 
         if (current.element && current.handlers?.onLeave) {
+            clearExitTimer()
             current.handlers.onLeave()
         }
 
-        if (resolved?.handlers?.onEnter) {
+        if (resolved.handlers?.onEnter) {
             resolved.handlers.onEnter()
         }
 
-        activeGazeTargetRef.current = resolved || { element: null, handlers: null }
-    }, [])
+        activeGazeTargetRef.current = {
+            element: resolved.element,
+            handlers: resolved.handlers,
+            exitTimeout: null
+        }
+    }, [GAZE_EXIT_DELAY_MS, GAZE_STICKY_MARGIN])
 
     const handleStableCursorUpdate = useCallback((position) => {
         setStableCursor((prev) => {

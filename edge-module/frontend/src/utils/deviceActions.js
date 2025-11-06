@@ -78,7 +78,6 @@ export async function getActionInfo(deviceType, action) {
 export const ACTION_COLORS = {
     'power': '#FF6B6B',           // 빨강
     'wind': '#4ECDC4',            // 청록
-    'mode': '#45B7D1',            // 파랑
     'temperature': '#FFA07A',     // 주황
 }
 
@@ -88,7 +87,6 @@ export const ACTION_COLORS = {
 export const ACTION_ICONS = {
     'power': 'Power',
     'wind': 'Wind',
-    'mode': 'Settings',
     'temperature': 'Thermometer',
     'Power': 'Power',
     'PowerOff': 'PowerOff',
@@ -177,7 +175,6 @@ export function getCategoryLabel(category) {
     const categoryLabels = {
         'operation': '작동 제어',
         'wind_strength': '바람 세기',
-        'operation_mode': '실행 모드',
         'temperature': '온도 설정',
     }
     return categoryLabels[category] || category

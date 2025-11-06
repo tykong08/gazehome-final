@@ -30,6 +30,9 @@ function GazeCursor({
     const smoothedPosRef = useRef(viewportCenter)
     const lastUpdateRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now())
     const magnetCheckIntervalRef = useRef(null)
+    const entryFreezeUntilRef = useRef(0)
+    const prevMagnetTargetRef = useRef(null)
+    const ENTRY_FREEZE_MS = 500
 
     const shouldFreeze = blink || !calibrated
 
@@ -45,8 +48,11 @@ function GazeCursor({
     }, [displayPos])
 
     useEffect(() => {
-        if (shouldFreeze) {
-            lastUpdateRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const entryFreezeActive = magnetTarget && now < entryFreezeUntilRef.current
+
+        if (shouldFreeze || entryFreezeActive) {
+            lastUpdateRef.current = now
             return
         }
 
@@ -54,7 +60,6 @@ function GazeCursor({
             return
         }
 
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
         const prevTimestamp = lastUpdateRef.current || now
         const deltaMs = Math.max(now - prevTimestamp, 16)
         lastUpdateRef.current = now
@@ -100,7 +105,7 @@ function GazeCursor({
             lastValidPosRef.current = { x: clampedX, y: clampedY }
             return { x: clampedX, y: clampedY }
         })
-    }, [x, y, shouldFreeze])
+    }, [x, y, shouldFreeze, magnetTarget])
 
     useEffect(() => {
         if (shouldFreeze) {
@@ -172,6 +177,20 @@ function GazeCursor({
             magnetized: Boolean(magnetTarget)
         })
     }, [displayX, displayY, shouldFreeze, magnetTarget, onStablePosition])
+
+    useEffect(() => {
+        const prev = prevMagnetTargetRef.current
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const hasChanged = magnetTarget && (!prev || prev.x !== magnetTarget.x || prev.y !== magnetTarget.y)
+
+        if (hasChanged) {
+            entryFreezeUntilRef.current = now + ENTRY_FREEZE_MS
+        } else if (!magnetTarget) {
+            entryFreezeUntilRef.current = 0
+        }
+
+        prevMagnetTargetRef.current = magnetTarget
+    }, [magnetTarget])
 
     return (
         <motion.div
