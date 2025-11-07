@@ -18,7 +18,7 @@ import { registerGazeTarget } from '../utils/gazeRegistry'
  * @param {boolean} isPointerLocked - 전역 포인터 고정 상태
  * @param {Function} onPointerEnter - 포인터 고정 콜백 (버튼 호버 시)
  */
-function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlink, isPointerLocked, onPointerEnter }) {
+function RecommendationModal({ recommendations, onAccept, onClose: _onClose, prolongedBlink, isPointerLocked, onPointerEnter: _onPointerEnter }) {
     // 🔒 포인터 고정 상태
     const [isLocked, setIsLocked] = useState(false)
     const lockTimerRef = useRef(null)
@@ -29,8 +29,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     // 이전 prolongedBlink 상태 추적 (상태 변화 감지용)
     const prevBlinkRef = useRef(false)
 
-    // 👁️ Dwell Time 기능 (3초간 바라보면 토글 - 데모 최적화)
-    const gazeCleanupRef = useRef({ accept: null })
+    const acceptCleanupRef = useRef(null)
 
     // 최상위 추천 (단일 추천)
     const topRecommendation = recommendations[0]
@@ -99,30 +98,24 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
         callback()
     }
 
-    /**
-     * 👁️ Dwell Time 시작: 버튼에 시선이 머물 때
-     */
-    const handleButtonLeave = () => {
-        // noop - retained for compatibility
-    }
-
     const triggerAccept = () => {
-        if (!topRecommendation || isLocked) return
-        console.log('[RecommendationModal] ✨ 즉시 수락 실행')
+        if (isLocked || !topRecommendation) {
+            return
+        }
+        console.log('[RecommendationModal] ⚡ 즉시 수락 트리거')
         handleButtonClick(() => onAccept(topRecommendation), true)
     }
 
     const setAcceptButtonRef = (node) => {
-        const cleanupStore = gazeCleanupRef.current
-        if (cleanupStore.accept) {
-            cleanupStore.accept()
-            cleanupStore.accept = null
+        if (acceptCleanupRef.current) {
+            acceptCleanupRef.current()
+            acceptCleanupRef.current = null
         }
 
         if (node) {
-            cleanupStore.accept = registerGazeTarget(node, {
+            acceptCleanupRef.current = registerGazeTarget(node, {
                 onEnter: triggerAccept,
-                onLeave: handleButtonLeave
+                onLeave: () => {}
             })
         }
     }
@@ -132,6 +125,10 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
         return () => {
             if (lockTimerRef.current) {
                 clearTimeout(lockTimerRef.current)
+            }
+            if (acceptCleanupRef.current) {
+                acceptCleanupRef.current()
+                acceptCleanupRef.current = null
             }
         }
     }, [])
@@ -145,6 +142,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     useEffect(() => {
         if (isLocked) return
 
+        // 이전 상태: false, 현재 상태: true (깜빡임 END)
         if (!prevBlinkRef.current && prolongedBlink) {
             prevBlinkRef.current = prolongedBlink
 
@@ -169,7 +167,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
             if (isInside) {
                 // 👁️ 모달 위에서 깜빡임 감지 → "적용하기" 버튼 클릭
                 console.log(`[RecommendationModal] 👁️ 1초 깜빡임 클릭 감지 - "적용하기" 실행`)
-                triggerAccept()
+                handleButtonClick(() => onAccept(topRecommendation), true)
             }
         } else {
             // 상태 업데이트
@@ -216,10 +214,17 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
                         <button
                             ref={setAcceptButtonRef}
                             className="action-button accept"
-                            data-immediate="true"
                             onMouseEnter={triggerAccept}
-                            onMouseLeave={handleButtonLeave}
+                            onMouseLeave={() => {}}
                             disabled={isLocked}
+                            style={{
+                                position: 'relative',
+                                overflow: 'hidden',
+                                opacity: 0,
+                                color: 'transparent',
+                                borderColor: 'transparent',
+                                background: 'transparent'
+                            }}
                         >
                             <CheckCircle size={20} />
                             수락

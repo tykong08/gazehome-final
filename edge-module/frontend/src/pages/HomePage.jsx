@@ -100,6 +100,7 @@ function HomePage({ onLogout }) {
     const [headerDwelling, setHeaderDwelling] = useState(null)
     const [headerProgress, setHeaderProgress] = useState(0)
     const HEADER_DWELL_MS = 1500
+    const PAGINATION_DWELL_MS = 5000
     const GAZE_STICKY_MARGIN = 35
     const GAZE_EXIT_DELAY_MS = 320
 
@@ -245,7 +246,7 @@ function HomePage({ onLogout }) {
         const startTime = Date.now()
         paginationTimerRef.current = setInterval(() => {
             const elapsed = Date.now() - startTime
-            const progress = Math.min((elapsed / 1500) * 100, 100)
+            const progress = Math.min((elapsed / PAGINATION_DWELL_MS) * 100, 100)
             setPaginationProgress(progress)
 
             if (progress >= 100) {
@@ -257,7 +258,7 @@ function HomePage({ onLogout }) {
                 lockPointer()
             }
         }, 50)
-    }, [isPointerLocked, lockPointer])
+    }, [PAGINATION_DWELL_MS, isPointerLocked, lockPointer])
 
     const updateGazeTarget = useCallback((cursorX, cursorY) => {
         const current = activeGazeTargetRef.current
@@ -516,10 +517,6 @@ function HomePage({ onLogout }) {
 
         await moveCursorTo(target, Math.max(420, Math.min(640, Math.hypot(rect.width, rect.height) * 14)))
 
-        const isImmediate = element.dataset?.immediate === 'true'
-        const effectiveDwell = isImmediate ? Math.min(360, dwellMs) : dwellMs
-        const effectiveSettle = isImmediate ? Math.min(180, settleMs) : settleMs
-
         const resolved = resolveGazeTarget(element)
         if (resolved?.handlers?.onEnter) {
             try {
@@ -529,7 +526,7 @@ function HomePage({ onLogout }) {
             }
         }
 
-        await pause(effectiveDwell)
+        await pause(dwellMs)
 
         if (resolved?.handlers?.onLeave) {
             try {
@@ -539,8 +536,8 @@ function HomePage({ onLogout }) {
             }
         }
 
-        if (effectiveSettle > 0) {
-            await pause(effectiveSettle)
+        if (settleMs > 0) {
+            await pause(settleMs)
         }
 
         return true
