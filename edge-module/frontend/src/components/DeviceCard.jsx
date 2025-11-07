@@ -71,7 +71,7 @@ function DeviceCard({ device, onControl }) {
     const [dwellingButton, setDwellingButton] = useState(null) // 현재 바라보는 버튼
     const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
     const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 1500 // 1.5초 응시로 액션 실행
+    const DWELL_TIME = 300 // 0.3초 응시로 액션 실행
 
     // ============================================================================
     // 초기화: 액션 정보 로드
@@ -167,6 +167,7 @@ function DeviceCard({ device, onControl }) {
                 console.log(`[DeviceCard] ✅ 액션 완료: ${result.message}`)
 
                 const normalized = (actionName || '').toLowerCase()
+                const isPowerToggle = normalized.includes('off') || normalized.includes('on')
                 if (normalized.includes('off')) {
                     setDeviceState((prev) => ({
                         ...prev,
@@ -186,8 +187,10 @@ function DeviceCard({ device, onControl }) {
                     status: 'success'
                 })
 
-                // 즉시 상태 업데이트
-                await fetchDeviceState() // ✅ 함수명 수정
+                // 즉시 상태 업데이트 (전원 토글은 로컬 상태 유지)
+                if (!isPowerToggle) {
+                    await fetchDeviceState()
+                }
 
                 // 부모 컴포넌트에 알림
                 if (onControl) {

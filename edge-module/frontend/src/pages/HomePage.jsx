@@ -99,7 +99,7 @@ function HomePage({ onLogout }) {
     const headerCleanupRef = useRef(new Map())
     const [headerDwelling, setHeaderDwelling] = useState(null)
     const [headerProgress, setHeaderProgress] = useState(0)
-    const HEADER_DWELL_MS = 1500
+    const HEADER_DWELL_MS = 300
     const PAGINATION_DWELL_MS = 5000
     const GAZE_STICKY_MARGIN = 35
     const GAZE_EXIT_DELAY_MS = 320
