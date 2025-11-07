@@ -16,7 +16,7 @@ import { resolveGazeTarget, registerGazeTarget } from '../utils/gazeRegistry'
  * - 시선 추적 커서 표시
  * - 실시간 시선 위치 기반 dwell time 제어
  * - AI 추천 모달 주기적 표시
- * - 👁️ 0.5초+ 눈깜빡임 감지 → 클릭 인식
+ * - 눈깜빡임(0.5초 이상) 감지 → 클릭 인식
  */
 function HomePage({ onLogout }) {
     // 연결된 기기 목록
@@ -52,12 +52,53 @@ function HomePage({ onLogout }) {
             magnetized: false
         }
     })
+    const autopilotEnabled = useMemo(() => {
+        if (typeof window === 'undefined') {
+            return false
+        }
+
+        try {
+            const params = new URLSearchParams(window.location.search)
+            if (params.has('demo')) {
+                return params.get('demo') !== '0'
+            }
+            const stored = window.localStorage?.getItem('gazehome_demo_autopilot')
+            if (stored !== null) {
+                return stored === 'true'
+            }
+        } catch (error) {
+            console.warn('[HomePage] Autopilot 설정 확인 실패:', error)
+        }
+
+        // 기본값: 데모 편의를 위해 활성화
+        return true
+    }, [])
+    const autopilotStateRef = useRef({
+        running: false,
+        completed: false,
+        waitingForRecommendation: false,
+        cancelled: false,
+        started: false
+    })
+    useEffect(() => {
+        console.log('[HomePage][Demo] autopilotEnabled:', autopilotEnabled)
+    }, [autopilotEnabled])
+    const autopilotActiveRef = useRef(false)
+    const autopilotTargetRef = useRef(null)
+    const autopilotTickerRef = useRef(null)
+    const autopilotTimeoutsRef = useRef(new Set())
+    const autopilotIntervalsRef = useRef(new Set())
 
     const activeGazeTargetRef = useRef({ element: null, handlers: null, exitTimeout: null })
     const paginationTimerRef = useRef(null)
     const paginationCleanupRef = useRef({ prev: null, next: null })
     const [paginationDwelling, setPaginationDwelling] = useState(null)
     const [paginationProgress, setPaginationProgress] = useState(0)
+    const headerTimersRef = useRef(new Map())
+    const headerCleanupRef = useRef(new Map())
+    const [headerDwelling, setHeaderDwelling] = useState(null)
+    const [headerProgress, setHeaderProgress] = useState(0)
+    const HEADER_DWELL_MS = 1500
     const GAZE_STICKY_MARGIN = 35
     const GAZE_EXIT_DELAY_MS = 320
 
@@ -69,18 +110,58 @@ function HomePage({ onLogout }) {
     ]
     // 현재 표시 중인 기기 인덱스
     const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0)
+    const currentDeviceIndexRef = useRef(currentDeviceIndex)
+    /**
+     * 📄 우선 순위 기기 목록 (에어컨/공기청정기 → 없으면 전체)
+     */
+    const autopilotDevices = useMemo(() => {
+        const pinned = devices.filter((device) =>
+            FIXED_DEVICE_IDS.includes(device.device_id)
+        )
+        if (pinned.length > 0) {
+            return pinned
+        }
+
+        const fallback = devices.filter((device) => {
+            const type = (device?.device_type || '').toLowerCase()
+            return type.includes('air_conditioner') || type.includes('aircon') || type.includes('purifier')
+        })
+
+        if (fallback.length > 0) {
+            return fallback
+        }
+
+        return devices
+    }, [devices])
+    useEffect(() => {
+        console.log('[HomePage][Demo] autopilotDevices:', autopilotDevices.map((device) => ({
+            id: device.device_id,
+            type: device.device_type,
+            name: device.name
+        })))
+    }, [autopilotDevices])
+
+    const displayDevices = autopilotDevices.length > 0
+        ? [autopilotDevices[currentDeviceIndex % autopilotDevices.length]]
+        : []
+
+    const purifierIndex = useMemo(() => (
+        autopilotDevices.findIndex(device =>
+            (device?.device_type || '').toLowerCase().includes('purifier')
+        )
+    ), [autopilotDevices])
 
     /**
      * 포인터 1.5초 고정 함수
      * - 버튼 클릭 시 호출
      * - 1.5초 동안 hovering 감지 차단
      */
-    const lockPointer = (duration = 1500) => {
+    const lockPointer = useCallback((duration = 1500) => {
         setIsPointerLocked(true)
         setTimeout(() => {
             setIsPointerLocked(false)
         }, duration)
-    }
+    }, [])
 
     const cancelPaginationDwell = useCallback(() => {
         if (paginationTimerRef.current) {
@@ -91,8 +172,56 @@ function HomePage({ onLogout }) {
         setPaginationProgress(0)
     }, [])
 
+    const cancelHeaderDwell = useCallback((key) => {
+        const timers = headerTimersRef.current
+        if (key) {
+            const timer = timers.get(key)
+            if (timer) {
+                clearInterval(timer)
+                timers.delete(key)
+            }
+            if (headerDwelling === key) {
+                setHeaderDwelling(null)
+                setHeaderProgress(0)
+            }
+        } else {
+            timers.forEach((timer) => clearInterval(timer))
+            timers.clear()
+            setHeaderDwelling(null)
+            setHeaderProgress(0)
+        }
+    }, [headerDwelling])
+
+    const startHeaderDwell = useCallback((key, callback) => {
+        if (!key || headerTimersRef.current.has(key) || isPointerLocked) {
+            return
+        }
+
+        setHeaderDwelling(key)
+        setHeaderProgress(0)
+
+        const startTime = Date.now()
+        const timer = setInterval(() => {
+            const elapsed = Date.now() - startTime
+            const progress = Math.min((elapsed / HEADER_DWELL_MS) * 100, 100)
+            setHeaderProgress(progress)
+
+            if (progress >= 100) {
+                clearInterval(timer)
+                headerTimersRef.current.delete(key)
+                setHeaderDwelling(null)
+                setHeaderProgress(0)
+                callback()
+                lockPointer()
+            }
+        }, 50)
+
+        headerTimersRef.current.set(key, timer)
+    }, [HEADER_DWELL_MS, isPointerLocked, lockPointer])
+
     const clearGazeTarget = useCallback(() => {
         cancelPaginationDwell()
+        cancelHeaderDwell()
         const current = activeGazeTargetRef.current
         if (current.exitTimeout) {
             clearTimeout(current.exitTimeout)
@@ -102,7 +231,7 @@ function HomePage({ onLogout }) {
             current.handlers.onLeave()
         }
         activeGazeTargetRef.current = { element: null, handlers: null, exitTimeout: null }
-    }, [cancelPaginationDwell])
+    }, [cancelPaginationDwell, cancelHeaderDwell])
 
     const startPaginationDwell = useCallback((buttonType, callback) => {
         if (paginationTimerRef.current || isPointerLocked) {
@@ -127,7 +256,7 @@ function HomePage({ onLogout }) {
                 lockPointer()
             }
         }, 50)
-    }, [isPointerLocked])
+    }, [isPointerLocked, lockPointer])
 
     const updateGazeTarget = useCallback((cursorX, cursorY) => {
         const current = activeGazeTargetRef.current
@@ -211,36 +340,367 @@ function HomePage({ onLogout }) {
         })
     }, [])
 
-    /**
-     * 📄 고정 기기만 필터링 (에어컨1, 공기청정기)
-     * 페이지네이션: 현재 인덱스의 기기만 표시
-     */
-    const fixedDevices = devices.filter(device =>
-        FIXED_DEVICE_IDS.includes(device.device_id)
-    )
+    useEffect(() => {
+        currentDeviceIndexRef.current = currentDeviceIndex
+    }, [currentDeviceIndex])
 
-    // 현재 표시할 기기 (배열의 첫 번째만 표시)
-    const displayDevices = fixedDevices.length > 0
-        ? [fixedDevices[currentDeviceIndex % fixedDevices.length]]
-        : []
+    const pause = useCallback((ms) => new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+            autopilotTimeoutsRef.current.delete(timeoutId)
+            resolve()
+        }, ms)
+        autopilotTimeoutsRef.current.add(timeoutId)
+    }), [])
 
+    const waitForCondition = useCallback((checkFn, timeout = 5000, intervalMs = 120) => new Promise((resolve) => {
+        const start = Date.now()
+        const intervalId = setInterval(() => {
+            if (autopilotStateRef.current.cancelled) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(false)
+                return
+            }
+            if (checkFn()) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(true)
+                return
+            }
+            if (Date.now() - start >= timeout) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(false)
+            }
+        }, intervalMs)
+        autopilotIntervalsRef.current.add(intervalId)
+    }), [])
+
+    const waitForElement = useCallback((getter, timeout = 5000) => new Promise((resolve) => {
+        const start = Date.now()
+        const intervalId = setInterval(() => {
+            if (autopilotStateRef.current.cancelled) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(null)
+                return
+            }
+            const element = getter()
+            if (element) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(element)
+                return
+            }
+            if (Date.now() - start >= timeout) {
+                clearInterval(intervalId)
+                autopilotIntervalsRef.current.delete(intervalId)
+                resolve(null)
+            }
+        }, 120)
+        autopilotIntervalsRef.current.add(intervalId)
+    }), [])
+
+    const ensureAutopilotTicker = useCallback(() => {
+        if (autopilotTickerRef.current) {
+            return
+        }
+        const intervalId = setInterval(() => {
+            if (!autopilotTargetRef.current) {
+                return
+            }
+            setGazePosition({
+                x: autopilotTargetRef.current.x,
+                y: autopilotTargetRef.current.y
+            })
+        }, 80)
+        autopilotTickerRef.current = intervalId
+        autopilotIntervalsRef.current.add(intervalId)
+    }, [setGazePosition])
+
+    const stopAutopilotOverride = useCallback(() => {
+        autopilotActiveRef.current = false
+        autopilotTargetRef.current = null
+
+        if (autopilotTickerRef.current) {
+            clearInterval(autopilotTickerRef.current)
+            autopilotIntervalsRef.current.delete(autopilotTickerRef.current)
+            autopilotTickerRef.current = null
+        }
+
+        autopilotTimeoutsRef.current.forEach((timeoutId) => {
+            clearTimeout(timeoutId)
+        })
+        autopilotTimeoutsRef.current.clear()
+
+        autopilotIntervalsRef.current.forEach((intervalId) => {
+            clearInterval(intervalId)
+        })
+        autopilotIntervalsRef.current.clear()
+    }, [])
+
+    const moveCursorTo = useCallback(async (target, duration = 520, easing = 'easeInOut') => {
+        if (!target) return
+
+        const startPos = autopilotTargetRef.current || {
+            x: stableCursor.x,
+            y: stableCursor.y
+        }
+
+        const clampedStart = {
+            x: Number.isFinite(startPos.x) ? startPos.x : window.innerWidth / 2,
+            y: Number.isFinite(startPos.y) ? startPos.y : window.innerHeight / 2
+        }
+
+        const deltaX = target.x - clampedStart.x
+        const deltaY = target.y - clampedStart.y
+        const distance = Math.hypot(deltaX, deltaY)
+        if (distance < 2) {
+            autopilotTargetRef.current = target
+            setGazePosition(target)
+            return
+        }
+
+        const steps = Math.max(Math.ceil(duration / 40), 6)
+
+        autopilotActiveRef.current = true
+        ensureAutopilotTicker()
+
+        const ease = (t) => {
+            switch (easing) {
+                case 'linear':
+                    return t
+                case 'easeOut':
+                    return 1 - Math.pow(1 - t, 2)
+                case 'easeIn':
+                    return t * t
+                default: // easeInOut
+                    return t < 0.5
+                        ? 2 * t * t
+                        : 1 - Math.pow(-2 * t + 2, 2) / 2
+            }
+        }
+
+        for (let i = 1; i <= steps; i++) {
+            if (autopilotStateRef.current.cancelled) {
+                break
+            }
+
+            const progress = ease(i / steps)
+            const intermediate = {
+                x: clampedStart.x + deltaX * progress,
+                y: clampedStart.y + deltaY * progress
+            }
+
+            autopilotTargetRef.current = intermediate
+            setGazePosition(intermediate)
+            await pause(duration / steps)
+        }
+
+        autopilotTargetRef.current = target
+        setGazePosition(target)
+    }, [ensureAutopilotTicker, pause, setGazePosition, stableCursor.x, stableCursor.y])
+
+    const dwellOnElement = useCallback(async (element, dwellMs = 1600, settleMs = 400) => {
+        if (!element) {
+            console.warn('[HomePage][Demo] dwellOnElement: element not found')
+            return false
+        }
+
+        const rect = element.getBoundingClientRect()
+        const target = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        }
+
+        await moveCursorTo(target, Math.max(420, Math.min(640, Math.hypot(rect.width, rect.height) * 14)))
+
+        const resolved = resolveGazeTarget(element)
+        if (resolved?.handlers?.onEnter) {
+            try {
+                resolved.handlers.onEnter()
+            } catch (error) {
+                console.warn('[HomePage][Demo] onEnter handler failed:', error)
+            }
+        }
+
+        await pause(dwellMs)
+
+        if (resolved?.handlers?.onLeave) {
+            try {
+                resolved.handlers.onLeave()
+            } catch (error) {
+                console.warn('[HomePage][Demo] onLeave handler failed:', error)
+            }
+        }
+
+        if (settleMs > 0) {
+            await pause(settleMs)
+        }
+
+        return true
+    }, [moveCursorTo, pause])
+
+    const findPurifierCard = useCallback(() => {
+        const cards = document.querySelectorAll('.device-card')
+        for (const card of cards) {
+            const typeText = card.querySelector('.device-type')?.textContent?.toLowerCase() || ''
+            if (typeText.includes('air_purifier')) {
+                return card
+            }
+        }
+        return null
+    }, [])
+
+    const findPurifierButton = useCallback((keyword) => {
+        const card = findPurifierCard()
+        if (!card) return null
+
+        const buttons = card.querySelectorAll('button')
+        for (const button of buttons) {
+            const text = button.textContent?.trim()
+            if (text && text.includes(keyword)) {
+                return button
+            }
+        }
+        return null
+    }, [findPurifierCard])
+
+    const clampValue = useCallback((value, min, max) => Math.min(Math.max(value, min), max), [])
+
+    const jitterCursor = useCallback(async (durationMs = 5000) => {
+        if (typeof window === 'undefined') {
+            return
+        }
+
+        const width = window.innerWidth
+        const height = window.innerHeight
+        const start = Date.now()
+
+        autopilotActiveRef.current = true
+        ensureAutopilotTicker()
+
+        while (Date.now() - start < durationMs) {
+            if (autopilotStateRef.current.cancelled || !autopilotActiveRef.current) {
+                break
+            }
+
+            const baseX = stableCursor.x || width / 2
+            const baseY = stableCursor.y || height / 2
+            const angle = Math.random() * Math.PI * 2
+            const radius = 28 + Math.random() * 24
+            const nextTarget = {
+                x: clampValue(baseX + Math.cos(angle) * radius, 24, width - 24),
+                y: clampValue(baseY + Math.sin(angle) * radius, 24, height - 24)
+            }
+
+            autopilotTargetRef.current = nextTarget
+            setGazePosition(nextTarget)
+
+            const wait = 320 + Math.random() * 180
+            await pause(wait)
+        }
+    }, [clampValue, ensureAutopilotTicker, pause, setGazePosition, stableCursor.x, stableCursor.y])
+
+    const runDemoSequence = useCallback(async () => {
+        if (!autopilotEnabled) {
+            return
+        }
+
+        const state = autopilotStateRef.current
+        if (state.running || state.completed || state.cancelled) {
+            return
+        }
+
+        if (autopilotDevices.length === 0 || purifierIndex === -1) {
+            state.completed = true
+            return
+        }
+
+        state.running = true
+        state.started = true
+        autopilotActiveRef.current = true
+        if (!autopilotTargetRef.current) {
+            autopilotTargetRef.current = { x: stableCursor.x, y: stableCursor.y }
+        }
+
+        try {
+            console.log('[HomePage][Demo] 초기 5초 포인터 워밍업 시작')
+            await jitterCursor(5000)
+            console.log('[HomePage][Demo] 초기 워밍업 완료')
+
+            if (autopilotDevices.length > 1 && currentDeviceIndexRef.current !== purifierIndex) {
+                const direction = purifierIndex > currentDeviceIndexRef.current ? 'next' : 'prev'
+                const paginationButton = await waitForElement(() => (
+                    document.querySelector(direction === 'next'
+                        ? '.pagination-button.next'
+                        : '.pagination-button.prev')
+                ), 4000)
+
+                if (paginationButton) {
+                    console.log('[HomePage][Demo] 페이지 전환 버튼 dwell 시작:', direction)
+                    await dwellOnElement(paginationButton)
+                    await waitForCondition(() => currentDeviceIndexRef.current === purifierIndex, 5000)
+                } else {
+                    console.warn('[HomePage][Demo] 페이지 전환 버튼을 찾을 수 없습니다')
+                }
+            }
+
+            const powerOnButton = await waitForElement(() => findPurifierButton('전원 켜'), 6000)
+            if (powerOnButton) {
+                console.log('[HomePage][Demo] 공기청정기 전원 켜기 dwell')
+                await dwellOnElement(powerOnButton)
+                console.log('[HomePage][Demo] 전원 켜기 후 10초 대기')
+                await pause(10000)
+            } else {
+                console.warn('[HomePage][Demo] 공기청정기 전원 켜기 버튼을 찾을 수 없습니다')
+            }
+
+            const powerOffButton = await waitForElement(() => findPurifierButton('전원 끄'), 6000)
+            if (powerOffButton) {
+                console.log('[HomePage][Demo] 공기청정기 전원 끄기 dwell')
+                await dwellOnElement(powerOffButton)
+                await pause(400)
+            } else {
+                console.warn('[HomePage][Demo] 공기청정기 전원 끄기 버튼을 찾을 수 없습니다')
+            }
+
+            state.waitingForRecommendation = true
+        } catch (error) {
+            console.error('[HomePage][Demo] 자동 데모 시퀀스 오류:', error)
+        } finally {
+            state.running = false
+        }
+    }, [
+        autopilotEnabled,
+        dwellOnElement,
+        findPurifierButton,
+        jitterCursor,
+        autopilotDevices.length,
+        pause,
+        purifierIndex,
+        stableCursor.x,
+        stableCursor.y,
+        waitForCondition,
+        waitForElement
+    ])
     // 다음 버튼 핸들러
     const handleNextDevice = useCallback(() => {
         cancelPaginationDwell()
-        if (fixedDevices.length > 0) {
-            setCurrentDeviceIndex((prev) => (prev + 1) % fixedDevices.length)
+        if (autopilotDevices.length > 0) {
+            setCurrentDeviceIndex((prev) => (prev + 1) % autopilotDevices.length)
         }
-    }, [cancelPaginationDwell, fixedDevices.length])
+    }, [cancelPaginationDwell, autopilotDevices.length])
 
     // 이전 버튼 핸들러
     const handlePrevDevice = useCallback(() => {
         cancelPaginationDwell()
-        if (fixedDevices.length > 0) {
+        if (autopilotDevices.length > 0) {
             setCurrentDeviceIndex((prev) =>
-                prev === 0 ? fixedDevices.length - 1 : prev - 1
+                prev === 0 ? autopilotDevices.length - 1 : prev - 1
             )
         }
-    }, [cancelPaginationDwell, fixedDevices.length])
+    }, [cancelPaginationDwell, autopilotDevices.length])
 
     const makePaginationButtonRef = useCallback((type, callback) => (node) => {
         const store = paginationCleanupRef.current
@@ -269,6 +729,29 @@ function HomePage({ onLogout }) {
         () => makePaginationButtonRef('next', handleNextDevice),
         [makePaginationButtonRef, handleNextDevice]
     )
+
+    const makeHeaderButtonRef = useCallback((key, callback) => (node) => {
+        const cleanupMap = headerCleanupRef.current
+        if (cleanupMap.has(key)) {
+            cleanupMap.get(key)()
+            cleanupMap.delete(key)
+        }
+
+        if (node) {
+            const cleanup = registerGazeTarget(node, {
+                onEnter: () => {
+                    const isDisabled = node.hasAttribute('disabled') || node.getAttribute('aria-disabled') === 'true'
+                    if (isDisabled) {
+                        cancelHeaderDwell(key)
+                        return
+                    }
+                    startHeaderDwell(key, callback)
+                },
+                onLeave: () => cancelHeaderDwell(key)
+            })
+            cleanupMap.set(key, cleanup)
+        }
+    }, [startHeaderDwell, cancelHeaderDwell])
 
     /**
      * 초기화: 사용자명 로드, 기기/추천 로드, WebSocket 연결
@@ -459,7 +942,9 @@ function HomePage({ onLogout }) {
 
             // 시선 업데이트 메시지 처리
             if (data.type === 'gaze_update' && data.gaze) {
-                setGazePosition({ x: data.gaze[0], y: data.gaze[1] })
+                if (!autopilotActiveRef.current) {
+                    setGazePosition({ x: data.gaze[0], y: data.gaze[1] })
+                }
 
                 // 👁️ 현재 눈깜빡임 상태 (포인터 고정)
                 if (data.blink !== undefined) {
@@ -531,6 +1016,97 @@ function HomePage({ onLogout }) {
     }
 
     useEffect(() => {
+        if (!autopilotEnabled) {
+            console.log('[HomePage][Demo] Autopilot disabled - skip runDemoSequence')
+            return
+        }
+        if (!calibrated) {
+            console.log('[HomePage][Demo] Not calibrated yet - wait')
+            return
+        }
+        if (autopilotDevices.length === 0) {
+            console.log('[HomePage][Demo] No autopilot devices available - skip')
+            return
+        }
+        if (autopilotStateRef.current.completed) {
+            console.log('[HomePage][Demo] Autopilot already completed - skip')
+            return
+        }
+        if (autopilotStateRef.current.cancelled) {
+            console.log('[HomePage][Demo] Autopilot cancelled - skip')
+            return
+        }
+        console.log('[HomePage][Demo] Trigger runDemoSequence()')
+        runDemoSequence()
+    }, [autopilotEnabled, calibrated, autopilotDevices.length, runDemoSequence])
+
+    useEffect(() => {
+        if (!autopilotEnabled) {
+            return
+        }
+        const state = autopilotStateRef.current
+        if (!state.waitingForRecommendation || state.running || state.completed) {
+            return
+        }
+        if (!showRecommendations || recommendations.length === 0) {
+            return
+        }
+
+        let active = true
+        state.running = true
+
+        const run = async () => {
+            try {
+                const acceptButton = await waitForElement(() => {
+                    const modal = document.querySelector('.recommendation-modal')
+                    return modal?.querySelector('.action-button.accept') || null
+                }, 5000)
+
+                if (!active) {
+                    return
+                }
+
+                if (acceptButton) {
+                    console.log('[HomePage][Demo] 추천 수락 dwell')
+                    await dwellOnElement(acceptButton)
+                } else {
+                    console.warn('[HomePage][Demo] 추천 수락 버튼을 찾을 수 없습니다')
+                }
+            } catch (error) {
+                console.error('[HomePage][Demo] 추천 수락 자동화 오류:', error)
+            } finally {
+                if (!active) {
+                    return
+                }
+                state.running = false
+                state.waitingForRecommendation = false
+                state.completed = true
+                stopAutopilotOverride()
+            }
+        }
+
+        run()
+
+        return () => {
+            active = false
+        }
+    }, [
+        autopilotEnabled,
+        dwellOnElement,
+        recommendations,
+        showRecommendations,
+        stopAutopilotOverride,
+        waitForElement
+    ])
+
+    useEffect(() => {
+        return () => {
+            autopilotStateRef.current.cancelled = true
+            stopAutopilotOverride()
+        }
+    }, [stopAutopilotOverride])
+
+    useEffect(() => {
         if (isPointerLocked || !calibrated || blink || stableCursor.frozen) {
             clearGazeTarget()
             return
@@ -543,6 +1119,22 @@ function HomePage({ onLogout }) {
 
     useEffect(() => () => clearGazeTarget(), [clearGazeTarget])
     useEffect(() => () => cancelPaginationDwell(), [cancelPaginationDwell])
+    useEffect(() => () => cancelHeaderDwell(), [cancelHeaderDwell])
+
+    const handleNotificationOpen = useCallback(() => {
+        setShowRecommendations(true)
+    }, [])
+
+    const handleRestartCalibration = useCallback(() => {
+        console.log('[HomePage] 🔄 보정 다시 시작')
+        window.location.href = '/calibration'
+    }, [])
+
+    const handleLogoutClick = useCallback(() => {
+        if (typeof onLogout === 'function') {
+            onLogout()
+        }
+    }, [onLogout])
 
     /**
      * 기기 제어
@@ -663,36 +1255,99 @@ function HomePage({ onLogout }) {
                         <div className="header-right">
                             {/* 알림 버튼 */}
                             <button
+                                ref={makeHeaderButtonRef('header_notification', handleNotificationOpen)}
                                 className="notification-button"
-                                onClick={() => setShowRecommendations(true)}
+                                onMouseEnter={() => startHeaderDwell('header_notification', handleNotificationOpen)}
+                                onMouseLeave={() => cancelHeaderDwell('header_notification')}
+                                onClick={handleNotificationOpen}
+                                style={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    background: headerDwelling === 'header_notification'
+                                        ? `linear-gradient(to right, var(--primary) ${headerProgress}%, transparent ${headerProgress}%)`
+                                        : undefined
+                                }}
                             >
                                 <Bell size={20} />
                                 {recommendations.length > 0 && (
                                     <span className="notification-badge">{recommendations.length}</span>
                                 )}
+                                {headerDwelling === 'header_notification' && (
+                                    <span
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: 0,
+                                            height: '3px',
+                                            width: `${headerProgress}%`,
+                                            backgroundColor: 'var(--primary)',
+                                            transition: 'width 50ms linear'
+                                        }}
+                                    />
+                                )}
                             </button>
-
-                            {/* 사용자 메뉴 */}
-                            <div className="user-menu">
-                                <User size={20} />
-                                <span>{username}</span>
-                            </div>
 
                             {/* 설정 버튼 → 다시 보정 화면 */}
                             <button
+                                ref={makeHeaderButtonRef('header_calibration', handleRestartCalibration)}
                                 className="icon-button"
-                                onClick={() => {
-                                    console.log('[HomePage] 🔄 보정 다시 시작')
-                                    window.location.href = '/calibration'
-                                }}
+                                onMouseEnter={() => startHeaderDwell('header_calibration', handleRestartCalibration)}
+                                onMouseLeave={() => cancelHeaderDwell('header_calibration')}
+                                onClick={handleRestartCalibration}
                                 title="다시 보정"
+                                style={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    background: headerDwelling === 'header_calibration'
+                                        ? `linear-gradient(to right, var(--primary) ${headerProgress}%, transparent ${headerProgress}%)`
+                                        : undefined
+                                }}
                             >
                                 <Settings size={20} />
+                                {headerDwelling === 'header_calibration' && (
+                                    <span
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: 0,
+                                            height: '3px',
+                                            width: `${headerProgress}%`,
+                                            backgroundColor: 'var(--primary)',
+                                            transition: 'width 50ms linear'
+                                        }}
+                                    />
+                                )}
                             </button>
 
                             {/* 로그아웃 버튼 */}
-                            <button className="icon-button" onClick={onLogout}>
+                            <button
+                                ref={makeHeaderButtonRef('header_logout', handleLogoutClick)}
+                                className="icon-button"
+                                onMouseEnter={() => startHeaderDwell('header_logout', handleLogoutClick)}
+                                onMouseLeave={() => cancelHeaderDwell('header_logout')}
+                                onClick={handleLogoutClick}
+                                style={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    background: headerDwelling === 'header_logout'
+                                        ? `linear-gradient(to right, var(--danger) ${headerProgress}%, transparent ${headerProgress}%)`
+                                        : undefined
+                                }}
+                            >
                                 <LogOut size={20} />
+                                {headerDwelling === 'header_logout' && (
+                                    <span
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: 0,
+                                            height: '3px',
+                                            width: `${headerProgress}%`,
+                                            backgroundColor: 'var(--danger)',
+                                            transition: 'width 50ms linear'
+                                        }}
+                                    />
+                                )}
                             </button>
                         </div>
                     </div>
@@ -708,7 +1363,7 @@ function HomePage({ onLogout }) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
-                        <h1>안녕하세요, {username}님!</h1>
+                        <h1>안녕하세요, {username}님</h1>
                         <p>시선으로 스마트홈을 제어해보세요</p>
                     </motion.div>
 
@@ -722,12 +1377,12 @@ function HomePage({ onLogout }) {
                         <div className="section-header">
                             <h2>내 기기</h2>
                             <span className="device-count">
-                                {fixedDevices.length}개 기기
+                                {autopilotDevices.length}개 기기
                             </span>
                         </div>
 
                         {/* 기기 페이지네이션 */}
-                        {fixedDevices.length > 0 ? (
+                        {autopilotDevices.length > 0 ? (
                             <>
                                 <div className="pagination-controls">
                                     {/* 이전 버튼 */}
@@ -737,7 +1392,7 @@ function HomePage({ onLogout }) {
                                         onMouseEnter={() => startPaginationDwell('prev', handlePrevDevice)}
                                         onMouseLeave={cancelPaginationDwell}
                                         onClick={handlePrevDevice}
-                                        disabled={fixedDevices.length === 1}
+                                        disabled={autopilotDevices.length === 1}
                                         style={{
                                             position: 'relative',
                                             overflow: 'hidden',
@@ -768,7 +1423,7 @@ function HomePage({ onLogout }) {
                                         <span className="current-page">
                                             {currentDeviceIndex + 1}
                                         </span>
-                                        <span> / {fixedDevices.length}</span>
+                                        <span> / {autopilotDevices.length}</span>
                                     </div>
 
                                     {/* 다음 버튼 */}
@@ -778,7 +1433,7 @@ function HomePage({ onLogout }) {
                                         onMouseEnter={() => startPaginationDwell('next', handleNextDevice)}
                                         onMouseLeave={cancelPaginationDwell}
                                         onClick={handleNextDevice}
-                                        disabled={fixedDevices.length === 1}
+                                        disabled={autopilotDevices.length === 1}
                                         style={{
                                             position: 'relative',
                                             overflow: 'hidden',

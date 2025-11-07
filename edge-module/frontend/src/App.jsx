@@ -67,18 +67,26 @@ function App() {
 
             const data = await response.json()
             console.log('[App] ✅ 자동 로그인 성공:', data)
+            console.log('[App] 📦 응답 데이터 상세:', {
+                success: data.success,
+                username: data.username,
+                has_calibration: data.has_calibration,
+                calibration_file: data.calibration_file,
+                type_of_has_calibration: typeof data.has_calibration
+            })
 
             // localStorage에 저장
             const username = data.username
             localStorage.setItem('gazehome_logged_in', 'true')
             localStorage.setItem('gazehome_username', username)
+            localStorage.setItem('gazehome_has_calibration', String(data.has_calibration))
 
             // ✅ 상태 업데이트를 동시에 처리 (React batching)
             // 이를 통해 중간에 !isCalibrated만 true인 상태 방지
+            console.log('[App] 상태 업데이트 전:', { isLoggedIn, isCalibrated })
             setIsLoggedIn(true)
             setIsCalibrated(data.has_calibration)
-
-            console.log(`[App] 보정 상태: ${data.has_calibration ? '✅ 보정됨' : '❌ 미보정'}`)
+            console.log(`[App] 🎯 setIsCalibrated(${data.has_calibration})로 호출됨`)
 
         } catch (error) {
             console.error('[App] ❌ 자동 로그인 실패:', error)

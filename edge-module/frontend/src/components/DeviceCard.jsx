@@ -399,13 +399,13 @@ function DeviceCard({ device, onControl }) {
             // 공기청정기: 전원 + 바람 + 모드
             const power = deviceState.power || 'OFF'
             const wind = deviceState.wind_strength || '-'
-            return `${power} | 바람: ${wind}`
+            return `${power} 상태 | 바람 세기: ${wind}`
         } else if (type.includes('aircon') || type.includes('air_con')) {
             // 에어컨: 전원 + 온도 + 바람
             const power = deviceState.power || 'OFF'
             const temp = deviceState.target_temp || '-'
             const wind = deviceState.wind_strength || '-'
-            return `${power} | ${temp}°C | 바람: ${wind}`
+            return `${power} 상태 | 온도: ${temp}°C | 바람 세기: ${wind}`
         }
 
         return '상태 미지원'

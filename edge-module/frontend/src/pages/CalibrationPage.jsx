@@ -823,22 +823,6 @@ function CalibrationPage({ onComplete }) {
  * 2. 프론트엔드 변경: 아래 offset 추가
  */
 function CalibrationPoint({ x, y, index, phase, progress, hasFace }) {
-    // ⚙️ 7inch 디스플레이 보정용 포인트 오프셋
-    const OFFSET_X_MAP = {
-        1: 24,
-        2: 20,
-        4: 18,
-        5: 18,
-        7: 16,
-        8: 20
-    }
-
-    const offsetX = OFFSET_X_MAP[index] || 0
-    const offsetY = 0
-
-    const adjustedX = x + offsetX
-    const adjustedY = y + offsetY
-
     // 기본 반경
     const baseRadius = 20
     // 펄싱 단계에서는 반경이 변함
@@ -875,8 +859,8 @@ function CalibrationPoint({ x, y, index, phase, progress, hasFace }) {
         <div
             className="calibration-point-container"
             style={{
-                left: adjustedX,
-                top: adjustedY,
+                left: x,
+                top: y,
                 transform: 'translate(-50%, -50%)'  // 포인트 중심에 정렬
             }}
         >
