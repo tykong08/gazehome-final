@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Sparkles, AlertCircle, CheckCircle } from 'lucide-react'
+import { Sparkles, CheckCircle } from 'lucide-react'
 import './RecommendationModal.css'
 import { registerGazeTarget } from '../utils/gazeRegistry'
 
@@ -30,11 +30,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     const prevBlinkRef = useRef(false)
 
     // 👁️ Dwell Time 기능 (3초간 바라보면 토글 - 데모 최적화)
-    const [dwellingButton, setDwellingButton] = useState(null) // 'accept' 또는 'reject'
-    const [dwellProgress, setDwellProgress] = useState(0) // 진행률 (0-100)
-    const dwellTimerRef = useRef(null)
-    const DWELL_TIME = 1500 // 1.5초 응시로 선택 확정
-    const gazeCleanupRef = useRef({ accept: null, reject: null })
+    const gazeCleanupRef = useRef({ accept: null })
 
     // 최상위 추천 (단일 추천)
     const topRecommendation = recommendations[0]
@@ -106,49 +102,14 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     /**
      * 👁️ Dwell Time 시작: 버튼에 시선이 머물 때
      */
-    const handleButtonEnter = (buttonType, callback, accepted) => {
-        if (isLocked) return
-
-        console.log(`[RecommendationModal] 👁️ Dwell 시작: ${buttonType}`)
-        setDwellingButton(buttonType)
-        setDwellProgress(0)
-
-        let startTime = Date.now()
-        dwellTimerRef.current = setInterval(() => {
-            const elapsed = Date.now() - startTime
-            const progress = Math.min((elapsed / DWELL_TIME) * 100, 100)
-            setDwellProgress(progress)
-
-            // 2초 완료
-            if (progress >= 100) {
-                clearInterval(dwellTimerRef.current)
-                console.log(`[RecommendationModal] ✅ Dwell 완료: ${buttonType}`)
-                handleButtonClick(callback, accepted)
-                setDwellingButton(null)
-                setDwellProgress(0)
-            }
-        }, 50)
-    }
-
-    /**
-     * 👁️ Dwell Time 취소: 버튼에서 시선이 떠날 때
-     */
     const handleButtonLeave = () => {
-        if (dwellTimerRef.current) {
-            clearInterval(dwellTimerRef.current)
-            console.log(`[RecommendationModal] ❌ Dwell 취소`)
-        }
-        setDwellingButton(null)
-        setDwellProgress(0)
+        // noop - retained for compatibility
     }
 
-    const startAcceptDwell = () => {
-        if (!topRecommendation) return
-        handleButtonEnter('accept', () => onAccept(topRecommendation), true)
-    }
-
-    const startRejectDwell = () => {
-        handleButtonEnter('reject', () => onClose(), false)
+    const triggerAccept = () => {
+        if (!topRecommendation || isLocked) return
+        console.log('[RecommendationModal] ✨ 즉시 수락 실행')
+        handleButtonClick(() => onAccept(topRecommendation), true)
     }
 
     const setAcceptButtonRef = (node) => {
@@ -160,22 +121,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
 
         if (node) {
             cleanupStore.accept = registerGazeTarget(node, {
-                onEnter: startAcceptDwell,
-                onLeave: handleButtonLeave
-            })
-        }
-    }
-
-    const setRejectButtonRef = (node) => {
-        const cleanupStore = gazeCleanupRef.current
-        if (cleanupStore.reject) {
-            cleanupStore.reject()
-            cleanupStore.reject = null
-        }
-
-        if (node) {
-            cleanupStore.reject = registerGazeTarget(node, {
-                onEnter: startRejectDwell,
+                onEnter: triggerAccept,
                 onLeave: handleButtonLeave
             })
         }
@@ -186,9 +132,6 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
         return () => {
             if (lockTimerRef.current) {
                 clearTimeout(lockTimerRef.current)
-            }
-            if (dwellTimerRef.current) {
-                clearInterval(dwellTimerRef.current)
             }
         }
     }, [])
@@ -202,7 +145,6 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
     useEffect(() => {
         if (isLocked) return
 
-        // 이전 상태: false, 현재 상태: true (깜빡임 END)
         if (!prevBlinkRef.current && prolongedBlink) {
             prevBlinkRef.current = prolongedBlink
 
@@ -227,7 +169,7 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
             if (isInside) {
                 // 👁️ 모달 위에서 깜빡임 감지 → "적용하기" 버튼 클릭
                 console.log(`[RecommendationModal] 👁️ 1초 깜빡임 클릭 감지 - "적용하기" 실행`)
-                handleButtonClick(() => onAccept(topRecommendation), true)
+                triggerAccept()
             }
         } else {
             // 상태 업데이트
@@ -273,59 +215,14 @@ function RecommendationModal({ recommendations, onAccept, onClose, prolongedBlin
                     <div className="modal-actions">
                         <button
                             ref={setAcceptButtonRef}
-                            className={`action-button accept ${dwellingButton === 'accept' ? 'dwelling' : ''}`}
-                            onMouseEnter={startAcceptDwell}
+                            className="action-button accept"
+                            data-immediate="true"
+                            onMouseEnter={triggerAccept}
                             onMouseLeave={handleButtonLeave}
                             disabled={isLocked}
-                            style={{
-                                position: 'relative',
-                                overflow: 'hidden',
-                                background: dwellingButton === 'accept'
-                                    ? `linear-gradient(to right, var(--success) ${dwellProgress}%, transparent ${dwellProgress}%)`
-                                    : ''
-                            }}
                         >
                             <CheckCircle size={20} />
                             수락
-                            {dwellingButton === 'accept' && (
-                                <span style={{
-                                    position: 'absolute',
-                                    bottom: 0,
-                                    left: 0,
-                                    height: '4px',
-                                    width: `${dwellProgress}%`,
-                                    backgroundColor: 'var(--success)',
-                                    transition: 'width 50ms linear'
-                                }}></span>
-                            )}
-                        </button>
-                        <button
-                            ref={setRejectButtonRef}
-                            className={`action-button reject ${dwellingButton === 'reject' ? 'dwelling' : ''}`}
-                            onMouseEnter={startRejectDwell}
-                            onMouseLeave={handleButtonLeave}
-                            disabled={isLocked}
-                            style={{
-                                position: 'relative',
-                                overflow: 'hidden',
-                                background: dwellingButton === 'reject'
-                                    ? `linear-gradient(to right, var(--danger) ${dwellProgress}%, transparent ${dwellProgress}%)`
-                                    : ''
-                            }}
-                        >
-                            <AlertCircle size={20} />
-                            거절
-                            {dwellingButton === 'reject' && (
-                                <span style={{
-                                    position: 'absolute',
-                                    bottom: 0,
-                                    left: 0,
-                                    height: '4px',
-                                    width: `${dwellProgress}%`,
-                                    backgroundColor: 'var(--danger)',
-                                    transition: 'width 50ms linear'
-                                }}></span>
-                            )}
                         </button>
                     </div>
                 </div>

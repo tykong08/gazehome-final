@@ -266,11 +266,24 @@ function DeviceCard({ device, onControl }) {
         }
 
         if (node) {
+            const actionKey = (action.action || '').toLowerCase()
+            const actionType = (action.type || '').toLowerCase()
+            const isPowerAction = actionType === 'power'
+            const isPowerOnAction = isPowerAction && (actionKey.includes('on') || actionKey.includes('start'))
+            const isPowerOffAction = isPowerAction && (actionKey.includes('off') || actionKey.includes('stop'))
+
             const enterHandler = () => {
                 if (!node || node.disabled) {
                     handleButtonLeave()
                     return
                 }
+
+                if (isPowerAction) {
+                    handleButtonLeave()
+                    handleActionClick(action.action, action)
+                    return
+                }
+
                 handleButtonEnter(action.action, action)
             }
 
@@ -509,15 +522,33 @@ function DeviceCard({ device, onControl }) {
                                         const isActive = lastAction?.name === action.action && lastAction?.status === 'success'
                                         const isDwelling = dwellingButton === action.action
                                         const actionType = (action.type || '').toLowerCase()
+                                        const actionKey = (action.action || '').toLowerCase()
                                         const isPowerAction = actionType === 'power'
-                                        const isActionEnabled = isPowerAction || isDevicePowered
-                                        const isDisabled = isExecuting || !isActionEnabled
+                                        const isPowerOnAction = isPowerAction && (actionKey.includes('on') || actionKey.includes('start'))
+                                        const isPowerOffAction = isPowerAction && (actionKey.includes('off') || actionKey.includes('stop'))
+
+                                        let isDisabled = isExecuting
+
+                                        if (isPowerOnAction) {
+                                            if (isDevicePowered) {
+                                                isDisabled = true
+                                            }
+                                        } else if (isPowerOffAction) {
+                                            if (!isDevicePowered) {
+                                                isDisabled = true
+                                            }
+                                        } else if (!isPowerAction && !isDevicePowered) {
+                                            isDisabled = true
+                                        }
+
+                                        const isImmediate = isPowerAction
 
                                         return (
                                             <motion.button
                                                 ref={getActionButtonRef(action)}
                                                 key={action.action}
                                                 className={`action-button ${isActive ? 'active' : ''} ${isDwelling ? 'dwelling' : ''}`}
+                                                data-immediate={isImmediate ? 'true' : undefined}
                                                 onMouseEnter={() => {
                                                     const handler = actionDwellCallbacksRef.current.get(action.action)
                                                     if (handler) {

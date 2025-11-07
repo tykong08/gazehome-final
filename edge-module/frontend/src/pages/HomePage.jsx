@@ -88,6 +88,7 @@ function HomePage({ onLogout }) {
     const autopilotTickerRef = useRef(null)
     const autopilotTimeoutsRef = useRef(new Set())
     const autopilotIntervalsRef = useRef(new Set())
+    const introAnimationRanRef = useRef(false)
 
     const activeGazeTargetRef = useRef({ element: null, handlers: null, exitTimeout: null })
     const paginationTimerRef = useRef(null)
@@ -515,6 +516,10 @@ function HomePage({ onLogout }) {
 
         await moveCursorTo(target, Math.max(420, Math.min(640, Math.hypot(rect.width, rect.height) * 14)))
 
+        const isImmediate = element.dataset?.immediate === 'true'
+        const effectiveDwell = isImmediate ? Math.min(360, dwellMs) : dwellMs
+        const effectiveSettle = isImmediate ? Math.min(180, settleMs) : settleMs
+
         const resolved = resolveGazeTarget(element)
         if (resolved?.handlers?.onEnter) {
             try {
@@ -524,7 +529,7 @@ function HomePage({ onLogout }) {
             }
         }
 
-        await pause(dwellMs)
+        await pause(effectiveDwell)
 
         if (resolved?.handlers?.onLeave) {
             try {
@@ -534,8 +539,8 @@ function HomePage({ onLogout }) {
             }
         }
 
-        if (settleMs > 0) {
-            await pause(settleMs)
+        if (effectiveSettle > 0) {
+            await pause(effectiveSettle)
         }
 
         return true
@@ -602,6 +607,24 @@ function HomePage({ onLogout }) {
         }
     }, [clampValue, ensureAutopilotTicker, pause, setGazePosition, stableCursor.x, stableCursor.y])
 
+    const startIntroAnimation = useCallback(async () => {
+        if (introAnimationRanRef.current) {
+            return
+        }
+        introAnimationRanRef.current = true
+
+        try {
+            console.log('[HomePage][Demo] Intro pointer animation start')
+            await jitterCursor(2600)
+        } catch (error) {
+            console.warn('[HomePage][Demo] Intro animation failed:', error)
+        } finally {
+            if (!autopilotStateRef.current.started) {
+                stopAutopilotOverride()
+            }
+        }
+    }, [jitterCursor, stopAutopilotOverride])
+
     const runDemoSequence = useCallback(async () => {
         if (!autopilotEnabled) {
             return
@@ -659,6 +682,7 @@ function HomePage({ onLogout }) {
             const powerOffButton = await waitForElement(() => findPurifierButton('전원 끄'), 6000)
             if (powerOffButton) {
                 console.log('[HomePage][Demo] 공기청정기 전원 끄기 dwell')
+
                 await dwellOnElement(powerOffButton)
                 await pause(400)
             } else {
@@ -1020,10 +1044,6 @@ function HomePage({ onLogout }) {
             console.log('[HomePage][Demo] Autopilot disabled - skip runDemoSequence')
             return
         }
-        if (!calibrated) {
-            console.log('[HomePage][Demo] Not calibrated yet - wait')
-            return
-        }
         if (autopilotDevices.length === 0) {
             console.log('[HomePage][Demo] No autopilot devices available - skip')
             return
@@ -1038,7 +1058,20 @@ function HomePage({ onLogout }) {
         }
         console.log('[HomePage][Demo] Trigger runDemoSequence()')
         runDemoSequence()
-    }, [autopilotEnabled, calibrated, autopilotDevices.length, runDemoSequence])
+    }, [autopilotEnabled, autopilotDevices.length, runDemoSequence])
+
+    useEffect(() => {
+        if (!autopilotEnabled) {
+            return
+        }
+        if (introAnimationRanRef.current) {
+            return
+        }
+        if (autopilotDevices.length === 0) {
+            return
+        }
+        startIntroAnimation()
+    }, [autopilotEnabled, autopilotDevices.length, startIntroAnimation])
 
     useEffect(() => {
         if (!autopilotEnabled) {
